@@ -1,19 +1,21 @@
 /*
  @preserve Leaflet Data Visualization Framework, a JavaScript library for creating thematic maps using Leaflet
  (c) 2013-2015, Scott Fairgrieve, HumanGeo
-*/;/*
+ */
+;
+/*
  * Class for interpolating values along a line using a linear equation
  */
 L.LinearFunction = L.Class.extend({
 	options: {
 		constrainX: false
 	},
-	
+
 	initialize: function (minPoint, maxPoint, options) {
 		this.setOptions(options);
 		this.setRange(minPoint, maxPoint);
 	},
-	
+
 	_calculateParameters: function (minPoint, maxPoint) {
 		if (this._xRange === 0) {
 			this._slope = 0;
@@ -24,67 +26,67 @@ L.LinearFunction = L.Class.extend({
 			this._b = minPoint.y - this._slope * minPoint.x;
 		}
 	},
-	
+
 	_arrayToPoint: function (array) {
 		return {
 			x: array[0],
 			y: array[1]
 		};
 	},
-	
+
 	setOptions: function (options) {
 		L.Util.setOptions(this, options);
-		
+
 		this._preProcess = this.options.preProcess;
 		this._postProcess = this.options.postProcess;
 	},
-	
+
 	getBounds: function () {
 		var minX = Math.min(this._minPoint.x, this._maxPoint.x);
 		var maxX = Math.max(this._minPoint.x, this._maxPoint.x);
 		var minY = Math.min(this._minPoint.y, this._maxPoint.y);
 		var maxY = Math.max(this._minPoint.y, this._maxPoint.y);
-		
+
 		return [new L.Point(minX, minY), new L.Point(maxX, maxY)];
 	},
-	
+
 	setRange: function (minPoint, maxPoint) {
 		minPoint = minPoint instanceof Array ? this._arrayToPoint(minPoint) : minPoint;
 		maxPoint = maxPoint instanceof Array ? this._arrayToPoint(maxPoint) : maxPoint;
-		
+
 		this._minPoint = minPoint;
 		this._maxPoint = maxPoint;
 		this._xRange = maxPoint.x - minPoint.x;
-		
+
 		this._calculateParameters(minPoint, maxPoint);
-		
+
 		return this;
 	},
-	
+
 	setMin: function (point) {
 		this.setRange(point, this._maxPoint);
-		
+
 		return this;
 	},
-	
+
 	setMax: function (point) {
 		this.setRange(this._minPoint, point);
-		
+
 		return this;
 	},
-	
+
 	setPreProcess: function (preProcess) {
 		this._preProcess = preProcess;
-		
+
 		return this;
 	},
-	
+
 	setPostProcess: function (postProcess) {
 		this._postProcess = postProcess;
-		
+
 		return this;
 	},
-	
+
 	constrainX: function (x) {
 		x = Number(x);
 
@@ -92,80 +94,80 @@ L.LinearFunction = L.Class.extend({
 			x = Math.max(x, this._minPoint.x);
 			x = Math.min(x, this._maxPoint.x);
 		}
-		
+
 		return x;
 	},
-	
+
 	evaluate: function (x) {
 		var y;
-		
+
 		if (this._preProcess) {
 			x = this._preProcess(x);
 		}
-		
+
 		// Call toFixed to ensure that both numbers being added are using the same precision
 		y = Number((this._slope * x).toFixed(6)) + Number(this._b.toFixed(6));
-		
+
 		if (this._postProcess) {
 			y = this._postProcess(y);
 		}
-		
+
 		return y;
 	},
-	
+
 	random: function () {
 		var randomX = Math.random() * this._xRange + this._minPoint.x;
-		
+
 		return this.evaluate(randomX);
 	},
-	
+
 	sample: function (count) {
 		count = Math.max(count, 2);
-		
+
 		var segmentCount = count - 1;
 		var segmentSize = this._xRange / segmentCount;
 		var x = this._minPoint.x;
 		var yValues = [];
-		
+
 		while (x <= this._maxPoint.x) {
 			yValues.push(this.evaluate(x));
-			
-			x += segmentSize;	
+
+			x += segmentSize;
 		}
-		
+
 		return yValues;
 	},
-	
+
 	samplePoints: function (count) {
 		count = Math.max(count, 2);
-		
+
 		var segmentCount = count - 1;
 		var segmentSize = this._xRange / segmentCount;
 		var x = this._minPoint.x;
 		var points = [];
-		
+
 		while (x <= this._maxPoint.x) {
 			points.push(new L.Point(x, this.evaluate(x)));
-			
-			x += segmentSize;	
+
+			x += segmentSize;
 		}
-		
+
 		return points;
 	},
-	
+
 	getIntersectionPoint: function (otherFunction) {
 		var point = null;
-		
+
 		if (this._slope !== otherFunction._slope) {
 			var x = (this._b - otherFunction._b)/(otherFunction._slope - this._slope);
 			var y = this.evaluate(x);
-			
+
 			point = new L.Point(x, y);
 		}
-		
+
 		return point;
 	}
-	
+
 });
 
 /*
@@ -176,74 +178,74 @@ L.ColorFunction = L.LinearFunction.extend({
 		alpha: 1.0,
 		includeAlpha: false
 	},
-	
+
 	initialize: function (minPoint, maxPoint, options) {
 		L.Util.setOptions(this, options);
-		
+
 		// Order of output parts (e.g., ['r','g','b'])
 		this._parts = [];
-	
+
 		// Part of the output that's dynamic (e.g. 'r')
 		this._dynamicPart = null;
 		this._outputPrecision = 0;
-	
+
 		// Output prefix (e.g. rgb, hsl, etc.)
 		this._prefix = null;
-	
+
 		// Override this as necessary
 		this._formatOutput = function (y) {
 			return y.toFixed(this._outputPrecision);
 		};
-	
+
 		this._mapOutput = function (parts) {
 			var outputParts = [];
-		
+
 			for (var i = 0; i < this._parts.length; ++i) {
 				var part = this._parts[i];
 				outputParts.push(parts[part]);
 			}
-		
+
 			if (this.options.includeAlpha) {
 				outputParts.push(this.options.alpha);
 			}
-		
+
 			return outputParts;
 		};
-	
-		this._getColorString = function (y) {		
+
+		this._getColorString = function (y) {
 			y = this._formatOutput(y);
-		
+
 			this.options[this._dynamicPart] = y;
-		
+
 			var parts = this._mapOutput(this.options);
-		
+
 			return this._writeColor(this._prefix, parts);
 		};
-	
+
 		this._writeColor = function (prefix, parts) {
 			if (this.options.includeAlpha) {
 				prefix += 'a';
 			}
-		
+
 			return prefix + '(' + parts.join(',') + ')';
 		};
-		
+
 		options = this.options;
 
 		var postProcess = function (y) {
 			if (options && options.postProcess) {
 				y = options.postProcess.call(this, y);
 			}
-			
+
 			var colorString = this._getColorString(y);
-			
+
 			if (((L.Browser.ie) && colorString.indexOf('hsl') > -1) || options.rgb) {
 				colorString = L.hslColor(colorString).toRGBString();
 			}
-			
+
 			return colorString;
 		};
-		
+
 		L.LinearFunction.prototype.initialize.call(this, minPoint, maxPoint, {
 			preProcess: this.options.preProcess,
 			postProcess: postProcess
@@ -264,7 +266,7 @@ L.HSLColorFunction = L.ColorFunction.extend({
 L.RGBColorFunction = L.ColorFunction.extend({
 	initialize: function (minPoint, maxPoint, options) {
 		L.ColorFunction.prototype.initialize.call(this, minPoint, maxPoint, options);
-		
+
 		this._parts = ['outputRed', 'outputBlue', 'outputGreen'];
 		this._prefix = 'rgb';
 		this._outputPrecision = 0;
@@ -272,15 +274,15 @@ L.RGBColorFunction = L.ColorFunction.extend({
 });
 
 L.RGBRedFunction = L.LinearFunction.extend({
-	
+
 	options: {
 		outputGreen: 0,
 		outputBlue: 0
 	},
-	
+
 	initialize: function (minPoint, maxPoint, options) {
 		L.RGBColorFunction.prototype.initialize.call(this, minPoint, maxPoint, options);
-		
+
 		this._dynamicPart = 'outputRed';
 	}
 });
@@ -289,15 +291,15 @@ L.RGBRedFunction = L.LinearFunction.extend({
  * 
  */
 L.RGBBlueFunction = L.LinearFunction.extend({
-	
+
 	options: {
 		outputRed: 0,
 		outputGreen: 0
 	},
-	
+
 	initialize: function (minPoint, maxPoint, options) {
 		L.RGBColorFunction.prototype.initialize.call(this, minPoint, maxPoint, options);
-		
+
 		this._dynamicPart = 'outputBlue';
 	}
 });
@@ -306,15 +308,15 @@ L.RGBBlueFunction = L.LinearFunction.extend({
  * 
  */
 L.RGBGreenFunction = L.LinearFunction.extend({
-	
+
 	options: {
 		outputRed: 0,
 		outputBlue: 0
 	},
-	
+
 	initialize: function (minPoint, maxPoint, options) {
 		L.RGBColorFunction.prototype.initialize.call(this, minPoint, maxPoint, options);
-		
+
 		this._dynamicPart = 'outputGreen';
 	}
 });
@@ -332,26 +334,26 @@ L.RGBColorBlendFunction = L.LinearFunction.extend({
 		var green2 = rgbMaxColor.g();
 		var blue1 = rgbMinColor.b();
 		var blue2 = rgbMaxColor.b();
-		
+
 		this._minX = minX;
 		this._maxX = maxX;
-		
+
 		this._redFunction = new L.LinearFunction(new L.Point(minX, red1), new L.Point(maxX, red2));
 		this._greenFunction = new L.LinearFunction(new L.Point(minX, green1), new L.Point(maxX, green2));
 		this._blueFunction = new L.LinearFunction(new L.Point(minX, blue1), new L.Point(maxX, blue2));
 	},
-	
+
 	getBounds: function () {
 		var redBounds = this._redFunction.getBounds();
 		var greenBounds = this._greenFunction.getBounds();
 		var blueBounds = this._blueFunction.getBounds();
-		
+
 		var minY = Math.min(redBounds[0].y, greenBounds[0].y, blueBounds[0].y);
 		var maxY = Math.max(redBounds[0].y, greenBounds[0].y, blueBounds[0].y);
-		
+
 		return [new L.Point(redBounds[0].x, minY), new L.Point(redBounds[1].x, maxY)];
 	},
-	
+
 	evaluate: function (x) {
 		return new L.RGBColor([this._redFunction.evaluate(x), this._greenFunction.evaluate(x), this._blueFunction.evaluate(x)]).toRGBString();
 	}
@@ -363,7 +365,7 @@ L.RGBColorBlendFunction = L.LinearFunction.extend({
  * Class for varying the hue linearly and producing an HSL color value
  */
 L.HSLHueFunction = L.HSLColorFunction.extend({
-	
+
 	options: {
 		outputSaturation: '100%',
 		outputLuminosity: '50%'
@@ -371,7 +373,7 @@ L.HSLHueFunction = L.HSLColorFunction.extend({
 
 	initialize: function (minPoint, maxPoint, options) {
 		L.HSLColorFunction.prototype.initialize.call(this, minPoint, maxPoint, options);
-		
+
 		this._dynamicPart = 'outputHue';
 	}
 });
@@ -380,19 +382,19 @@ L.HSLHueFunction = L.HSLColorFunction.extend({
  * Class for varying the saturation linearly and producing an HSL color value
  */
 L.HSLSaturationFunction = L.LinearFunction.extend({
-	
+
 	options: {
 		outputHue: 0,
 		outputLuminosity: '50%'
 	},
-	
+
 	initialize: function (minPoint, maxPoint, options) {
 		L.HSLColorFunction.prototype.initialize.call(this, minPoint, maxPoint, options);
-		
+
 		this._formatOutput = function (y) {
 			return (y * 100).toFixed(this._outputPrecision) + '%';
 		};
-		
+
 		this._dynamicPart = 'outputSaturation';
 	}
 });
@@ -401,19 +403,19 @@ L.HSLSaturationFunction = L.LinearFunction.extend({
  * Class for varying the luminosity linearly and producing an HSL color value
  */
 L.HSLLuminosityFunction = L.LinearFunction.extend({
-	
+
 	options: {
 		outputHue: 0,
 		outputSaturation: '100%'
 	},
-	
+
 	initialize: function (minPoint, maxPoint, options) {
 		L.HSLColorFunction.prototype.initialize.call(this, minPoint, maxPoint, options);
-		
+
 		this._formatOutput = function (y) {
 			return (y * 100).toFixed(this._outputPrecision) + '%';
 		};
-		
+
 		this._dynamicPart = 'outputLuminosity';
 	}
 });
@@ -431,26 +433,26 @@ L.HSLColorBlendFunction = L.LinearFunction.extend({
 		var s2 = hslMaxColor.s();
 		var l1 = hslMinColor.l();
 		var l2 = hslMaxColor.l();
-		
+
 		this._minX = minX;
 		this._maxX = maxX;
-		
+
 		this._hueFunction = new L.LinearFunction(new L.Point(minX, h1), new L.Point(maxX, h2));
 		this._saturationFunction = new L.LinearFunction(new L.Point(minX, s1), new L.Point(maxX, s2));
 		this._luminosityFunction = new L.LinearFunction(new L.Point(minX, l1), new L.Point(maxX, l2));
 	},
-	
+
 	getBounds: function () {
 		var hBounds = this._hueFunction.getBounds();
 		var sBounds = this._saturationFunction.getBounds();
 		var lBounds = this._luminosityFunction.getBounds();
-		
+
 		var minY = Math.min(hBounds[0].y, sBounds[0].y, lBounds[0].y);
 		var maxY = Math.max(hBounds[0].y, sBounds[0].y, lBounds[0].y);
-		
+
 		return [new L.Point(hBounds[0].x, minY), new L.Point(hBounds[1].x, maxY)];
 	},
-	
+
 	evaluate: function (x) {
 		return new L.HSLColor([this._hueFunction.evaluate(x), this._saturationFunction.evaluate(x), this._luminosityFunction.evaluate(x)]).toHSLString();
 	}
@@ -463,31 +465,31 @@ L.PiecewiseFunction = L.LinearFunction.extend({
 	options: {
 		constrainX: true
 	},
-	
+
 	initialize: function (functions, options) {
-		
+
 		L.Util.setOptions(this, options);
-		
+
 		this._functions = functions;
-		
+
 		var startPoint;
 		var endPoint;
-		
+
 		startPoint = functions[0].getBounds()[0];
 		endPoint = functions[functions.length - 1].getBounds()[1];
-		
+
 		L.LinearFunction.prototype.initialize.call(this, startPoint, endPoint, {
 			preProcess: this.options.preProcess,
 			postProcess: this.options.postProcess
 		});
 	},
-	
+
 	_getFunction: function (x) {
 		var bounds;
 		var startPoint;
 		var endPoint;
 		var currentFunction;
-		
+
 		if (x < this._minPoint.x) {
 			currentFunction = this._functions[0];
 		}
@@ -498,10 +500,10 @@ L.PiecewiseFunction = L.LinearFunction.extend({
 			for (var index = 0; index < this._functions.length; ++index) {
 				currentFunction = this._functions[index];
 				bounds = currentFunction.getBounds();
-				
+
 				startPoint = bounds[0];
 				endPoint = bounds[1];
-				
+
 				if (x >= startPoint.x && x < endPoint.x) {
 					break;
 				}
@@ -510,27 +512,27 @@ L.PiecewiseFunction = L.LinearFunction.extend({
 
 		return currentFunction;
 	},
-	
+
 	evaluate: function (x) {
 		var currentFunction;
 		var y = null;
-		
+
 		x = this.constrainX(x);
-		
+
 		if (this._preProcess) {
 			x = this._preProcess(x);
 		}
-		
+
 		currentFunction = this._getFunction(x);
-		
+
 		if (currentFunction) {
 			y = currentFunction.evaluate(x);
-			
+
 			if (this._postProcess) {
 				y = this._postProcess(y);
 			}
 		}
-		
+
 		return y;
 	}
 });
@@ -542,24 +544,24 @@ L.ColorClassFunction = L.PiecewiseFunction.extend({
 	options: {
 		interpolate: false
 	},
-	
+
 	initialize: function (classBreaks, colors, options) {
 		var functions = [];
 		var colorFunction;
-		
+
 		L.Util.setOptions(this, options);
-		
+
 		for (var i = 0; i < classBreaks.length - 1; ++i) {
 			var start = classBreaks[i],
 				end = classBreaks[i + 1],
 				startColor = colors[i],
-				endColor = this.options.interpolate ? colors[Math.min(colors.length -1, i + 1)] : colors[i];
-			
+				endColor = this.options.interpolate ? colors[Math.min(colors.length - 1, i + 1)] : colors[i];
+
 			colorFunction = new L.RGBColorBlendFunction(start, end, startColor, endColor);
-			
-			functions.push(colorFunction);	
+
+			functions.push(colorFunction);
 		}
-		
+
 		L.PiecewiseFunction.prototype.initialize.call(this, functions);
 	}
 });
@@ -568,75 +570,78 @@ L.CustomColorFunction = L.PiecewiseFunction.extend({
 	options: {
 		interpolate: true
 	},
-	
+
 	initialize: function (minX, maxX, colors, options) {
 
-    L.Util.setOptions(this, options);
-    
+		L.Util.setOptions(this, options);
+
 		var range = maxX - minX;
 		var count = this.options.interpolate ? colors.length - 1 : colors.length;
-		var xRange = range/count;
+		var xRange = range / count;
 		var functions = [];
 		var colorFunction;
 		var next;
-		
+
 		var func = new L.LinearFunction([0, minX], [count, maxX]);
-		
+
 		for (var i = 0; i < count; ++i) {
 			next = i + 1;
 			//colorFunction = this.options.interpolate ? new L.RGBColorBlendFunction(minX + xRange * i, minX + xRange * next, colors[i], colors[next]) : new L.RGBColorBlendFunction(minX + xRange * i, minX + xRange * next, colors[i], colors[i]);
 			colorFunction = this.options.interpolate ? new L.RGBColorBlendFunction(func.evaluate(i), func.evaluate(next), colors[i], colors[next]) : new L.RGBColorBlendFunction(func.evaluate(i), func.evaluate(next), colors[i], colors[i]);
-			
-			functions.push(colorFunction);	
+
+			functions.push(colorFunction);
 		}
-		
+
 		func = null;
-		
+
 		L.PiecewiseFunction.prototype.initialize.call(this, functions);
 	}
-	
+
 });
 
 
 L.CategoryFunction = L.Class.extend({
 	initialize: function (categoryMap, options) {
-		
+
 		L.Util.setOptions(this, options);
-		
+
 		this._categoryKeys = Object.keys(categoryMap);
 		this._categoryMap = categoryMap;
-		
+
 		this._preProcess = this.options.preProcess;
 		this._postProcess = this.options.postProcess;
 	},
-	
+
 	evaluate: function (x) {
 		var y;
-		
+
 		if (this._preProcess) {
 			x = this._preProcess(x);
 		}
-		
+
 		y = this._categoryMap[x];
-		
+
 		if (this._postProcess) {
 			y = this._postProcess(y);
 		}
-		
+
 		return y;
 	},
-	
+
 	getCategories: function () {
 		return this._categoryKeys;
 	}
-});;// indexOf doesn't work in IE 8 and below, so add this method if it doesn't exist
+});
+;// indexOf doesn't work in IE 8 and below, so add this method if it doesn't exist
 // Copied from:  http://stackoverflow.com/questions/1744310/how-to-fix-array-indexof-in-javascript-for-ie-browsers
 if (!Array.prototype.indexOf) {
 	Array.prototype.indexOf = function(obj, start) {
-		 for (var i = (start || 0), j = this.length; i < j; i++) {
-			 if (this[i] === obj) { return i; }
-		 }
-		 return -1;
+		for (var i = (start || 0), j = this.length; i < j; i++) {
+			if (this[i] === obj) {
+				return i;
+			}
+		}
+		return -1;
 	};
 }
 
@@ -653,7 +658,7 @@ if (!Object.keys) {
 				'isPrototypeOf',
 				'propertyIsEnumerable',
 				'constructor'],
-	        dontEnumsLength = dontEnums.length;
+			dontEnumsLength = dontEnums.length;
 
 		return function (obj) {
 			var result, prop, i;
@@ -678,15 +683,15 @@ if (!Object.keys) {
 				}
 			}
 			return result;
-	    };
+		};
 	})();
 }
 
 L.Util.guid = function () {
 	var s4 = function() {
-	  return Math.floor((1 + Math.random()) * 0x10000)
-				 .toString(16)
-				 .substring(1);
+		return Math.floor((1 + Math.random()) * 0x10000)
+			.toString(16)
+			.substring(1);
 	};
 
 	return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
@@ -797,17 +802,17 @@ L.Util.pointToGeoJSON = function () {
 		},
 		properties: {}
 	};
-	
+
 	for (var key in this.options) {
 		if (this.options.hasOwnProperty(key)) {
 			var value = this.options[key];
-			
+
 			if (typeof(value) !== 'function') {
 				feature.properties[key] = value;
 			}
 		}
 	}
-	
+
 	return feature;
 };
 
@@ -1148,9 +1153,9 @@ L.SVGPathBuilder = L.Class.extend({
 		if (points.length > 0) {
 
 			var point = points[0];
-			
+
 			digits = digits !== null ? digits : 2;
-			
+
 			var startChar = 'M';
 			var lineToChar = 'L';
 			var closePath = 'Z';
@@ -1276,7 +1281,7 @@ L.StyleConverter = {
 
 	setCSSProperty: function (element, key, value, keyMap) {
 		keyMap = keyMap || L.StyleConverter.keyMap;
-		
+
 		var cssProperty = keyMap[key];
 		var cssText = '';
 
@@ -1378,13 +1383,13 @@ L.HTMLUtils = {
 		var table = L.DomUtil.create('table', className, fragment);
 		var thead = L.DomUtil.create('thead', '', table);
 		var tbody = L.DomUtil.create('tbody', '', table);
-		
+
 		var thead_tr = L.DomUtil.create('tr', '', thead);
-        var thead_values = ['Name','Value'];
-        for (var i = 0, l = thead_values.length; i < l; i++) {
-            var thead_th = L.DomUtil.create('th', '', thead_tr);
-            thead_th.innerHTML = thead_values[i];
-        }
+		var thead_values = ['Name', 'Value'];
+		for (var i = 0, l = thead_values.length; i < l; i++) {
+			var thead_th = L.DomUtil.create('th', '', thead_tr);
+			thead_th.innerHTML = thead_values[i];
+		}
 
 		ignoreFields = ignoreFields || [];
 
@@ -1405,13 +1410,13 @@ L.HTMLUtils = {
 					container.appendChild(L.HTMLUtils.buildTable(value, ignoreFields));
 					value = container.innerHTML;
 				}
-				
+
 				var tbody_tr = L.DomUtil.create('tr', '', tbody);
-                var tbody_values = [property, value];
-                for (i = 0, l = tbody_values.length; i < l; i++) {
-                    var tbody_td = L.DomUtil.create('td', '', tbody_tr);
-                    tbody_td.innerHTML = tbody_values[i];
-                }
+				var tbody_values = [property, value];
+				for (i = 0, l = tbody_values.length; i < l; i++) {
+					var tbody_td = L.DomUtil.create('td', '', tbody_tr);
+					tbody_td.innerHTML = tbody_values[i];
+				}
 			}
 		}
 
@@ -1500,27 +1505,33 @@ L.Color = L.Class.extend({
 	 * @return  Array           The HSL representation
 	 */
 	rgbToHSL: function(r, g, b){
-	    r /= 255;
-	    g /= 255; 
-	    b /= 255;
-	    
-	    var max = Math.max(r, g, b), min = Math.min(r, g, b);
-	    var h, s, l = (max + min) / 2;
+		r /= 255;
+		g /= 255;
+		b /= 255;
 
-	    if(max == min){
-	        h = s = 0; // achromatic
-	    }else{
-	        var d = max - min;
-	        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-	        switch(max){
-	            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-	            case g: h = (b - r) / d + 2; break;
-	            case b: h = (r - g) / d + 4; break;
-	        }
-	        h /= 6;
-	    }
+		var max = Math.max(r, g, b), min = Math.min(r, g, b);
+		var h, s, l = (max + min) / 2;
 
-	    return [h, s, l];
+		if (max == min) {
+			h = s = 0; // achromatic
+		} else {
+			var d = max - min;
+			s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+			switch (max) {
+				case r:
+					h = (g - b) / d + (g < b ? 6 : 0);
+					break;
+				case g:
+					h = (b - r) / d + 2;
+					break;
+				case b:
+					h = (r - g) / d + 4;
+					break;
+			}
+			h /= 6;
+		}
+
+		return [h, s, l];
 	},
 
 	/**
@@ -1535,27 +1546,27 @@ L.Color = L.Class.extend({
 	 * @return  Array           The RGB representation
 	 */
 	hslToRGB: function(h, s, l){
-	    var r, g, b;
-	    var hue2rgb = function (p, q, t){
-            if(t < 0) t += 1;
-            if(t > 1) t -= 1;
-            if(t < 1/6) return p + (q - p) * 6 * t;
-            if(t < 1/2) return q;
-            if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-            return p;
-        };
-        
-	    if(s === 0){
-	        r = g = b = l; // achromatic
-	    }else{
-	        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-	        var p = 2 * l - q;
-	        r = hue2rgb(p, q, h + 1/3);
-	        g = hue2rgb(p, q, h);
-	        b = hue2rgb(p, q, h - 1/3);
-	    }
+		var r, g, b;
+		var hue2rgb = function (p, q, t) {
+			if (t < 0) t += 1;
+			if (t > 1) t -= 1;
+			if (t < 1 / 6) return p + (q - p) * 6 * t;
+			if (t < 1 / 2) return q;
+			if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+			return p;
+		};
 
-	    return [Math.floor(r * 255), Math.floor(g * 255), Math.floor(b * 255)];
+		if (s === 0) {
+			r = g = b = l; // achromatic
+		} else {
+			var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+			var p = 2 * l - q;
+			r = hue2rgb(p, q, h + 1 / 3);
+			g = hue2rgb(p, q, h);
+			b = hue2rgb(p, q, h - 1 / 3);
+		}
+
+		return [Math.floor(r * 255), Math.floor(g * 255), Math.floor(b * 255)];
 	},
 
 	setRGB: function (r, g, b) {
@@ -1619,38 +1630,38 @@ L.Color = L.Class.extend({
 
 	r: function (newR) {
 		if (!arguments.length) return this._rgb[0];
-    	return this.setRGB(newR, this._rgb[1], this._rgb[2]);
+		return this.setRGB(newR, this._rgb[1], this._rgb[2]);
 	},
 
 	g: function (newG) {
 		if (!arguments.length) return this._rgb[1];
-    	return this.setRGB(this._rgb[0], newG, this._rgb[2]);
+		return this.setRGB(this._rgb[0], newG, this._rgb[2]);
 	},
 
 	b: function (newB) {
 		if (!arguments.length) return this._rgb[2];
-    	return this.setRGB(this._rgb[0], this._rgb[1], newB);
+		return this.setRGB(this._rgb[0], this._rgb[1], newB);
 	},
 
 	h: function (newH) {
 		if (!arguments.length) return this._hsl[0];
-    	return this.setHSL(newH, this._hsl[1], this._hsl[2]);
+		return this.setHSL(newH, this._hsl[1], this._hsl[2]);
 	},
 
 	s: function (newS) {
 		if (!arguments.length) return this._hsl[1];
-    	return this.setHSL(this._hsl[0], newS, this._hsl[2]);
+		return this.setHSL(this._hsl[0], newS, this._hsl[2]);
 	},
 
 	l: function (newL) {
 		if (!arguments.length) return this._hsl[2];
-    	return this.setHSL(this._hsl[0], this._hsl[1], newL);
+		return this.setHSL(this._hsl[0], this._hsl[1], newL);
 	},
 
 	a: function (newA) {
 		if (!arguments.length) return this._a;
-    	this._a = newA;
-    	return this;
+		this._a = newA;
+		return this;
 	}
 });
 
@@ -1748,14 +1759,14 @@ L.Animation = L.Class.extend({
 		this._easeFunction = easeFunction; // Function that takes time as an input parameter
 		this._animateFrame = animateFrame;
 	},
-	
+
 	run: function (el, options) { // (HTMLElement, Point[, Number, Number])
 		this.stop();
 
 		this._el = el;
 		this._inProgress = true;
 		this._duration = options.duration || 0.25;
-		
+
 		this._animationOptions = options;
 		this._startTime = +new Date();
 
@@ -1779,7 +1790,7 @@ L.Animation = L.Class.extend({
 
 	_step: function () {
 		var elapsed = (+new Date()) - this._startTime,
-		    duration = this._duration * 1000;
+			duration = this._duration * 1000;
 
 		if (elapsed < duration) {
 			this._runFrame(this._easeFunction(elapsed / duration));
@@ -1801,348 +1812,349 @@ L.Animation = L.Class.extend({
 		this._inProgress = false;
 		this.fire('end');
 	}
-});;// @preserve This product includes color specifications and designs developed by Cynthia Brewer (http://colorbrewer.org/).
+});
+;// @preserve This product includes color specifications and designs developed by Cynthia Brewer (http://colorbrewer.org/).
 // Adapted from:  https://raw.github.com/mbostock/d3/master/lib/colorbrewer/colorbrewer.js
 L.ColorBrewer = {
 	Sequential: {
 		YlGn: {
-		3: ["#f7fcb9","#addd8e","#31a354"],
-		4: ["#ffffcc","#c2e699","#78c679","#238443"],
-		5: ["#ffffcc","#c2e699","#78c679","#31a354","#006837"],
-		6: ["#ffffcc","#d9f0a3","#addd8e","#78c679","#31a354","#006837"],
-		7: ["#ffffcc","#d9f0a3","#addd8e","#78c679","#41ab5d","#238443","#005a32"],
-		8: ["#ffffe5","#f7fcb9","#d9f0a3","#addd8e","#78c679","#41ab5d","#238443","#005a32"],
-		9: ["#ffffe5","#f7fcb9","#d9f0a3","#addd8e","#78c679","#41ab5d","#238443","#006837","#004529"]
+			3: ["#f7fcb9", "#addd8e", "#31a354"],
+			4: ["#ffffcc", "#c2e699", "#78c679", "#238443"],
+			5: ["#ffffcc", "#c2e699", "#78c679", "#31a354", "#006837"],
+			6: ["#ffffcc", "#d9f0a3", "#addd8e", "#78c679", "#31a354", "#006837"],
+			7: ["#ffffcc", "#d9f0a3", "#addd8e", "#78c679", "#41ab5d", "#238443", "#005a32"],
+			8: ["#ffffe5", "#f7fcb9", "#d9f0a3", "#addd8e", "#78c679", "#41ab5d", "#238443", "#005a32"],
+			9: ["#ffffe5", "#f7fcb9", "#d9f0a3", "#addd8e", "#78c679", "#41ab5d", "#238443", "#006837", "#004529"]
 		},
 		YlGnBu: {
-		3: ["#edf8b1","#7fcdbb","#2c7fb8"],
-		4: ["#ffffcc","#a1dab4","#41b6c4","#225ea8"],
-		5: ["#ffffcc","#a1dab4","#41b6c4","#2c7fb8","#253494"],
-		6: ["#ffffcc","#c7e9b4","#7fcdbb","#41b6c4","#2c7fb8","#253494"],
-		7: ["#ffffcc","#c7e9b4","#7fcdbb","#41b6c4","#1d91c0","#225ea8","#0c2c84"],
-		8: ["#ffffd9","#edf8b1","#c7e9b4","#7fcdbb","#41b6c4","#1d91c0","#225ea8","#0c2c84"],
-		9: ["#ffffd9","#edf8b1","#c7e9b4","#7fcdbb","#41b6c4","#1d91c0","#225ea8","#253494","#081d58"]
+			3: ["#edf8b1", "#7fcdbb", "#2c7fb8"],
+			4: ["#ffffcc", "#a1dab4", "#41b6c4", "#225ea8"],
+			5: ["#ffffcc", "#a1dab4", "#41b6c4", "#2c7fb8", "#253494"],
+			6: ["#ffffcc", "#c7e9b4", "#7fcdbb", "#41b6c4", "#2c7fb8", "#253494"],
+			7: ["#ffffcc", "#c7e9b4", "#7fcdbb", "#41b6c4", "#1d91c0", "#225ea8", "#0c2c84"],
+			8: ["#ffffd9", "#edf8b1", "#c7e9b4", "#7fcdbb", "#41b6c4", "#1d91c0", "#225ea8", "#0c2c84"],
+			9: ["#ffffd9", "#edf8b1", "#c7e9b4", "#7fcdbb", "#41b6c4", "#1d91c0", "#225ea8", "#253494", "#081d58"]
 		},
 		GnBu: {
-		3: ["#e0f3db","#a8ddb5","#43a2ca"],
-		4: ["#f0f9e8","#bae4bc","#7bccc4","#2b8cbe"],
-		5: ["#f0f9e8","#bae4bc","#7bccc4","#43a2ca","#0868ac"],
-		6: ["#f0f9e8","#ccebc5","#a8ddb5","#7bccc4","#43a2ca","#0868ac"],
-		7: ["#f0f9e8","#ccebc5","#a8ddb5","#7bccc4","#4eb3d3","#2b8cbe","#08589e"],
-		8: ["#f7fcf0","#e0f3db","#ccebc5","#a8ddb5","#7bccc4","#4eb3d3","#2b8cbe","#08589e"],
-		9: ["#f7fcf0","#e0f3db","#ccebc5","#a8ddb5","#7bccc4","#4eb3d3","#2b8cbe","#0868ac","#084081"]
+			3: ["#e0f3db", "#a8ddb5", "#43a2ca"],
+			4: ["#f0f9e8", "#bae4bc", "#7bccc4", "#2b8cbe"],
+			5: ["#f0f9e8", "#bae4bc", "#7bccc4", "#43a2ca", "#0868ac"],
+			6: ["#f0f9e8", "#ccebc5", "#a8ddb5", "#7bccc4", "#43a2ca", "#0868ac"],
+			7: ["#f0f9e8", "#ccebc5", "#a8ddb5", "#7bccc4", "#4eb3d3", "#2b8cbe", "#08589e"],
+			8: ["#f7fcf0", "#e0f3db", "#ccebc5", "#a8ddb5", "#7bccc4", "#4eb3d3", "#2b8cbe", "#08589e"],
+			9: ["#f7fcf0", "#e0f3db", "#ccebc5", "#a8ddb5", "#7bccc4", "#4eb3d3", "#2b8cbe", "#0868ac", "#084081"]
 		},
 		BuGn: {
-		3: ["#e5f5f9","#99d8c9","#2ca25f"],
-		4: ["#edf8fb","#b2e2e2","#66c2a4","#238b45"],
-		5: ["#edf8fb","#b2e2e2","#66c2a4","#2ca25f","#006d2c"],
-		6: ["#edf8fb","#ccece6","#99d8c9","#66c2a4","#2ca25f","#006d2c"],
-		7: ["#edf8fb","#ccece6","#99d8c9","#66c2a4","#41ae76","#238b45","#005824"],
-		8: ["#f7fcfd","#e5f5f9","#ccece6","#99d8c9","#66c2a4","#41ae76","#238b45","#005824"],
-		9: ["#f7fcfd","#e5f5f9","#ccece6","#99d8c9","#66c2a4","#41ae76","#238b45","#006d2c","#00441b"]
+			3: ["#e5f5f9", "#99d8c9", "#2ca25f"],
+			4: ["#edf8fb", "#b2e2e2", "#66c2a4", "#238b45"],
+			5: ["#edf8fb", "#b2e2e2", "#66c2a4", "#2ca25f", "#006d2c"],
+			6: ["#edf8fb", "#ccece6", "#99d8c9", "#66c2a4", "#2ca25f", "#006d2c"],
+			7: ["#edf8fb", "#ccece6", "#99d8c9", "#66c2a4", "#41ae76", "#238b45", "#005824"],
+			8: ["#f7fcfd", "#e5f5f9", "#ccece6", "#99d8c9", "#66c2a4", "#41ae76", "#238b45", "#005824"],
+			9: ["#f7fcfd", "#e5f5f9", "#ccece6", "#99d8c9", "#66c2a4", "#41ae76", "#238b45", "#006d2c", "#00441b"]
 		},
 		PuBuGn: {
-		3: ["#ece2f0","#a6bddb","#1c9099"],
-		4: ["#f6eff7","#bdc9e1","#67a9cf","#02818a"],
-		5: ["#f6eff7","#bdc9e1","#67a9cf","#1c9099","#016c59"],
-		6: ["#f6eff7","#d0d1e6","#a6bddb","#67a9cf","#1c9099","#016c59"],
-		7: ["#f6eff7","#d0d1e6","#a6bddb","#67a9cf","#3690c0","#02818a","#016450"],
-		8: ["#fff7fb","#ece2f0","#d0d1e6","#a6bddb","#67a9cf","#3690c0","#02818a","#016450"],
-		9: ["#fff7fb","#ece2f0","#d0d1e6","#a6bddb","#67a9cf","#3690c0","#02818a","#016c59","#014636"]
+			3: ["#ece2f0", "#a6bddb", "#1c9099"],
+			4: ["#f6eff7", "#bdc9e1", "#67a9cf", "#02818a"],
+			5: ["#f6eff7", "#bdc9e1", "#67a9cf", "#1c9099", "#016c59"],
+			6: ["#f6eff7", "#d0d1e6", "#a6bddb", "#67a9cf", "#1c9099", "#016c59"],
+			7: ["#f6eff7", "#d0d1e6", "#a6bddb", "#67a9cf", "#3690c0", "#02818a", "#016450"],
+			8: ["#fff7fb", "#ece2f0", "#d0d1e6", "#a6bddb", "#67a9cf", "#3690c0", "#02818a", "#016450"],
+			9: ["#fff7fb", "#ece2f0", "#d0d1e6", "#a6bddb", "#67a9cf", "#3690c0", "#02818a", "#016c59", "#014636"]
 		},
 		PuBu: {
-		3: ["#ece7f2","#a6bddb","#2b8cbe"],
-		4: ["#f1eef6","#bdc9e1","#74a9cf","#0570b0"],
-		5: ["#f1eef6","#bdc9e1","#74a9cf","#2b8cbe","#045a8d"],
-		6: ["#f1eef6","#d0d1e6","#a6bddb","#74a9cf","#2b8cbe","#045a8d"],
-		7: ["#f1eef6","#d0d1e6","#a6bddb","#74a9cf","#3690c0","#0570b0","#034e7b"],
-		8: ["#fff7fb","#ece7f2","#d0d1e6","#a6bddb","#74a9cf","#3690c0","#0570b0","#034e7b"],
-		9: ["#fff7fb","#ece7f2","#d0d1e6","#a6bddb","#74a9cf","#3690c0","#0570b0","#045a8d","#023858"]
+			3: ["#ece7f2", "#a6bddb", "#2b8cbe"],
+			4: ["#f1eef6", "#bdc9e1", "#74a9cf", "#0570b0"],
+			5: ["#f1eef6", "#bdc9e1", "#74a9cf", "#2b8cbe", "#045a8d"],
+			6: ["#f1eef6", "#d0d1e6", "#a6bddb", "#74a9cf", "#2b8cbe", "#045a8d"],
+			7: ["#f1eef6", "#d0d1e6", "#a6bddb", "#74a9cf", "#3690c0", "#0570b0", "#034e7b"],
+			8: ["#fff7fb", "#ece7f2", "#d0d1e6", "#a6bddb", "#74a9cf", "#3690c0", "#0570b0", "#034e7b"],
+			9: ["#fff7fb", "#ece7f2", "#d0d1e6", "#a6bddb", "#74a9cf", "#3690c0", "#0570b0", "#045a8d", "#023858"]
 		},
 		BuPu: {
-		3: ["#e0ecf4","#9ebcda","#8856a7"],
-		4: ["#edf8fb","#b3cde3","#8c96c6","#88419d"],
-		5: ["#edf8fb","#b3cde3","#8c96c6","#8856a7","#810f7c"],
-		6: ["#edf8fb","#bfd3e6","#9ebcda","#8c96c6","#8856a7","#810f7c"],
-		7: ["#edf8fb","#bfd3e6","#9ebcda","#8c96c6","#8c6bb1","#88419d","#6e016b"],
-		8: ["#f7fcfd","#e0ecf4","#bfd3e6","#9ebcda","#8c96c6","#8c6bb1","#88419d","#6e016b"],
-		9: ["#f7fcfd","#e0ecf4","#bfd3e6","#9ebcda","#8c96c6","#8c6bb1","#88419d","#810f7c","#4d004b"]
+			3: ["#e0ecf4", "#9ebcda", "#8856a7"],
+			4: ["#edf8fb", "#b3cde3", "#8c96c6", "#88419d"],
+			5: ["#edf8fb", "#b3cde3", "#8c96c6", "#8856a7", "#810f7c"],
+			6: ["#edf8fb", "#bfd3e6", "#9ebcda", "#8c96c6", "#8856a7", "#810f7c"],
+			7: ["#edf8fb", "#bfd3e6", "#9ebcda", "#8c96c6", "#8c6bb1", "#88419d", "#6e016b"],
+			8: ["#f7fcfd", "#e0ecf4", "#bfd3e6", "#9ebcda", "#8c96c6", "#8c6bb1", "#88419d", "#6e016b"],
+			9: ["#f7fcfd", "#e0ecf4", "#bfd3e6", "#9ebcda", "#8c96c6", "#8c6bb1", "#88419d", "#810f7c", "#4d004b"]
 		},
 		RdPu: {
-		3: ["#fde0dd","#fa9fb5","#c51b8a"],
-		4: ["#feebe2","#fbb4b9","#f768a1","#ae017e"],
-		5: ["#feebe2","#fbb4b9","#f768a1","#c51b8a","#7a0177"],
-		6: ["#feebe2","#fcc5c0","#fa9fb5","#f768a1","#c51b8a","#7a0177"],
-		7: ["#feebe2","#fcc5c0","#fa9fb5","#f768a1","#dd3497","#ae017e","#7a0177"],
-		8: ["#fff7f3","#fde0dd","#fcc5c0","#fa9fb5","#f768a1","#dd3497","#ae017e","#7a0177"],
-		9: ["#fff7f3","#fde0dd","#fcc5c0","#fa9fb5","#f768a1","#dd3497","#ae017e","#7a0177","#49006a"]
+			3: ["#fde0dd", "#fa9fb5", "#c51b8a"],
+			4: ["#feebe2", "#fbb4b9", "#f768a1", "#ae017e"],
+			5: ["#feebe2", "#fbb4b9", "#f768a1", "#c51b8a", "#7a0177"],
+			6: ["#feebe2", "#fcc5c0", "#fa9fb5", "#f768a1", "#c51b8a", "#7a0177"],
+			7: ["#feebe2", "#fcc5c0", "#fa9fb5", "#f768a1", "#dd3497", "#ae017e", "#7a0177"],
+			8: ["#fff7f3", "#fde0dd", "#fcc5c0", "#fa9fb5", "#f768a1", "#dd3497", "#ae017e", "#7a0177"],
+			9: ["#fff7f3", "#fde0dd", "#fcc5c0", "#fa9fb5", "#f768a1", "#dd3497", "#ae017e", "#7a0177", "#49006a"]
 		},
 		PuRd: {
-		3: ["#e7e1ef","#c994c7","#dd1c77"],
-		4: ["#f1eef6","#d7b5d8","#df65b0","#ce1256"],
-		5: ["#f1eef6","#d7b5d8","#df65b0","#dd1c77","#980043"],
-		6: ["#f1eef6","#d4b9da","#c994c7","#df65b0","#dd1c77","#980043"],
-		7: ["#f1eef6","#d4b9da","#c994c7","#df65b0","#e7298a","#ce1256","#91003f"],
-		8: ["#f7f4f9","#e7e1ef","#d4b9da","#c994c7","#df65b0","#e7298a","#ce1256","#91003f"],
-		9: ["#f7f4f9","#e7e1ef","#d4b9da","#c994c7","#df65b0","#e7298a","#ce1256","#980043","#67001f"]
+			3: ["#e7e1ef", "#c994c7", "#dd1c77"],
+			4: ["#f1eef6", "#d7b5d8", "#df65b0", "#ce1256"],
+			5: ["#f1eef6", "#d7b5d8", "#df65b0", "#dd1c77", "#980043"],
+			6: ["#f1eef6", "#d4b9da", "#c994c7", "#df65b0", "#dd1c77", "#980043"],
+			7: ["#f1eef6", "#d4b9da", "#c994c7", "#df65b0", "#e7298a", "#ce1256", "#91003f"],
+			8: ["#f7f4f9", "#e7e1ef", "#d4b9da", "#c994c7", "#df65b0", "#e7298a", "#ce1256", "#91003f"],
+			9: ["#f7f4f9", "#e7e1ef", "#d4b9da", "#c994c7", "#df65b0", "#e7298a", "#ce1256", "#980043", "#67001f"]
 		},
 		OrRd: {
-		3: ["#fee8c8","#fdbb84","#e34a33"],
-		4: ["#fef0d9","#fdcc8a","#fc8d59","#d7301f"],
-		5: ["#fef0d9","#fdcc8a","#fc8d59","#e34a33","#b30000"],
-		6: ["#fef0d9","#fdd49e","#fdbb84","#fc8d59","#e34a33","#b30000"],
-		7: ["#fef0d9","#fdd49e","#fdbb84","#fc8d59","#ef6548","#d7301f","#990000"],
-		8: ["#fff7ec","#fee8c8","#fdd49e","#fdbb84","#fc8d59","#ef6548","#d7301f","#990000"],
-		9: ["#fff7ec","#fee8c8","#fdd49e","#fdbb84","#fc8d59","#ef6548","#d7301f","#b30000","#7f0000"]
+			3: ["#fee8c8", "#fdbb84", "#e34a33"],
+			4: ["#fef0d9", "#fdcc8a", "#fc8d59", "#d7301f"],
+			5: ["#fef0d9", "#fdcc8a", "#fc8d59", "#e34a33", "#b30000"],
+			6: ["#fef0d9", "#fdd49e", "#fdbb84", "#fc8d59", "#e34a33", "#b30000"],
+			7: ["#fef0d9", "#fdd49e", "#fdbb84", "#fc8d59", "#ef6548", "#d7301f", "#990000"],
+			8: ["#fff7ec", "#fee8c8", "#fdd49e", "#fdbb84", "#fc8d59", "#ef6548", "#d7301f", "#990000"],
+			9: ["#fff7ec", "#fee8c8", "#fdd49e", "#fdbb84", "#fc8d59", "#ef6548", "#d7301f", "#b30000", "#7f0000"]
 		},
 		YlOrRd: {
-		3: ["#ffeda0","#feb24c","#f03b20"],
-		4: ["#ffffb2","#fecc5c","#fd8d3c","#e31a1c"],
-		5: ["#ffffb2","#fecc5c","#fd8d3c","#f03b20","#bd0026"],
-		6: ["#ffffb2","#fed976","#feb24c","#fd8d3c","#f03b20","#bd0026"],
-		7: ["#ffffb2","#fed976","#feb24c","#fd8d3c","#fc4e2a","#e31a1c","#b10026"],
-		8: ["#ffffcc","#ffeda0","#fed976","#feb24c","#fd8d3c","#fc4e2a","#e31a1c","#b10026"],
-		9: ["#ffffcc","#ffeda0","#fed976","#feb24c","#fd8d3c","#fc4e2a","#e31a1c","#bd0026","#800026"]
+			3: ["#ffeda0", "#feb24c", "#f03b20"],
+			4: ["#ffffb2", "#fecc5c", "#fd8d3c", "#e31a1c"],
+			5: ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"],
+			6: ["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"],
+			7: ["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#b10026"],
+			8: ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#b10026"],
+			9: ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#bd0026", "#800026"]
 		},
 		YlOrBr: {
-		3: ["#fff7bc","#fec44f","#d95f0e"],
-		4: ["#ffffd4","#fed98e","#fe9929","#cc4c02"],
-		5: ["#ffffd4","#fed98e","#fe9929","#d95f0e","#993404"],
-		6: ["#ffffd4","#fee391","#fec44f","#fe9929","#d95f0e","#993404"],
-		7: ["#ffffd4","#fee391","#fec44f","#fe9929","#ec7014","#cc4c02","#8c2d04"],
-		8: ["#ffffe5","#fff7bc","#fee391","#fec44f","#fe9929","#ec7014","#cc4c02","#8c2d04"],
-		9: ["#ffffe5","#fff7bc","#fee391","#fec44f","#fe9929","#ec7014","#cc4c02","#993404","#662506"]
+			3: ["#fff7bc", "#fec44f", "#d95f0e"],
+			4: ["#ffffd4", "#fed98e", "#fe9929", "#cc4c02"],
+			5: ["#ffffd4", "#fed98e", "#fe9929", "#d95f0e", "#993404"],
+			6: ["#ffffd4", "#fee391", "#fec44f", "#fe9929", "#d95f0e", "#993404"],
+			7: ["#ffffd4", "#fee391", "#fec44f", "#fe9929", "#ec7014", "#cc4c02", "#8c2d04"],
+			8: ["#ffffe5", "#fff7bc", "#fee391", "#fec44f", "#fe9929", "#ec7014", "#cc4c02", "#8c2d04"],
+			9: ["#ffffe5", "#fff7bc", "#fee391", "#fec44f", "#fe9929", "#ec7014", "#cc4c02", "#993404", "#662506"]
 		},
 		Purples: {
-		3: ["#efedf5","#bcbddc","#756bb1"],
-		4: ["#f2f0f7","#cbc9e2","#9e9ac8","#6a51a3"],
-		5: ["#f2f0f7","#cbc9e2","#9e9ac8","#756bb1","#54278f"],
-		6: ["#f2f0f7","#dadaeb","#bcbddc","#9e9ac8","#756bb1","#54278f"],
-		7: ["#f2f0f7","#dadaeb","#bcbddc","#9e9ac8","#807dba","#6a51a3","#4a1486"],
-		8: ["#fcfbfd","#efedf5","#dadaeb","#bcbddc","#9e9ac8","#807dba","#6a51a3","#4a1486"],
-		9: ["#fcfbfd","#efedf5","#dadaeb","#bcbddc","#9e9ac8","#807dba","#6a51a3","#54278f","#3f007d"]
+			3: ["#efedf5", "#bcbddc", "#756bb1"],
+			4: ["#f2f0f7", "#cbc9e2", "#9e9ac8", "#6a51a3"],
+			5: ["#f2f0f7", "#cbc9e2", "#9e9ac8", "#756bb1", "#54278f"],
+			6: ["#f2f0f7", "#dadaeb", "#bcbddc", "#9e9ac8", "#756bb1", "#54278f"],
+			7: ["#f2f0f7", "#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3", "#4a1486"],
+			8: ["#fcfbfd", "#efedf5", "#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3", "#4a1486"],
+			9: ["#fcfbfd", "#efedf5", "#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3", "#54278f", "#3f007d"]
 		},
 		Blues: {
-		3: ["#deebf7","#9ecae1","#3182bd"],
-		4: ["#eff3ff","#bdd7e7","#6baed6","#2171b5"],
-		5: ["#eff3ff","#bdd7e7","#6baed6","#3182bd","#08519c"],
-		6: ["#eff3ff","#c6dbef","#9ecae1","#6baed6","#3182bd","#08519c"],
-		7: ["#eff3ff","#c6dbef","#9ecae1","#6baed6","#4292c6","#2171b5","#084594"],
-		8: ["#f7fbff","#deebf7","#c6dbef","#9ecae1","#6baed6","#4292c6","#2171b5","#084594"],
-		9: ["#f7fbff","#deebf7","#c6dbef","#9ecae1","#6baed6","#4292c6","#2171b5","#08519c","#08306b"]
+			3: ["#deebf7", "#9ecae1", "#3182bd"],
+			4: ["#eff3ff", "#bdd7e7", "#6baed6", "#2171b5"],
+			5: ["#eff3ff", "#bdd7e7", "#6baed6", "#3182bd", "#08519c"],
+			6: ["#eff3ff", "#c6dbef", "#9ecae1", "#6baed6", "#3182bd", "#08519c"],
+			7: ["#eff3ff", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#084594"],
+			8: ["#f7fbff", "#deebf7", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#084594"],
+			9: ["#f7fbff", "#deebf7", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#08519c", "#08306b"]
 		},
 		Greens: {
-		3: ["#e5f5e0","#a1d99b","#31a354"],
-		4: ["#edf8e9","#bae4b3","#74c476","#238b45"],
-		5: ["#edf8e9","#bae4b3","#74c476","#31a354","#006d2c"],
-		6: ["#edf8e9","#c7e9c0","#a1d99b","#74c476","#31a354","#006d2c"],
-		7: ["#edf8e9","#c7e9c0","#a1d99b","#74c476","#41ab5d","#238b45","#005a32"],
-		8: ["#f7fcf5","#e5f5e0","#c7e9c0","#a1d99b","#74c476","#41ab5d","#238b45","#005a32"],
-		9: ["#f7fcf5","#e5f5e0","#c7e9c0","#a1d99b","#74c476","#41ab5d","#238b45","#006d2c","#00441b"]
+			3: ["#e5f5e0", "#a1d99b", "#31a354"],
+			4: ["#edf8e9", "#bae4b3", "#74c476", "#238b45"],
+			5: ["#edf8e9", "#bae4b3", "#74c476", "#31a354", "#006d2c"],
+			6: ["#edf8e9", "#c7e9c0", "#a1d99b", "#74c476", "#31a354", "#006d2c"],
+			7: ["#edf8e9", "#c7e9c0", "#a1d99b", "#74c476", "#41ab5d", "#238b45", "#005a32"],
+			8: ["#f7fcf5", "#e5f5e0", "#c7e9c0", "#a1d99b", "#74c476", "#41ab5d", "#238b45", "#005a32"],
+			9: ["#f7fcf5", "#e5f5e0", "#c7e9c0", "#a1d99b", "#74c476", "#41ab5d", "#238b45", "#006d2c", "#00441b"]
 		},
 		Oranges: {
-		3: ["#fee6ce","#fdae6b","#e6550d"],
-		4: ["#feedde","#fdbe85","#fd8d3c","#d94701"],
-		5: ["#feedde","#fdbe85","#fd8d3c","#e6550d","#a63603"],
-		6: ["#feedde","#fdd0a2","#fdae6b","#fd8d3c","#e6550d","#a63603"],
-		7: ["#feedde","#fdd0a2","#fdae6b","#fd8d3c","#f16913","#d94801","#8c2d04"],
-		8: ["#fff5eb","#fee6ce","#fdd0a2","#fdae6b","#fd8d3c","#f16913","#d94801","#8c2d04"],
-		9: ["#fff5eb","#fee6ce","#fdd0a2","#fdae6b","#fd8d3c","#f16913","#d94801","#a63603","#7f2704"]
+			3: ["#fee6ce", "#fdae6b", "#e6550d"],
+			4: ["#feedde", "#fdbe85", "#fd8d3c", "#d94701"],
+			5: ["#feedde", "#fdbe85", "#fd8d3c", "#e6550d", "#a63603"],
+			6: ["#feedde", "#fdd0a2", "#fdae6b", "#fd8d3c", "#e6550d", "#a63603"],
+			7: ["#feedde", "#fdd0a2", "#fdae6b", "#fd8d3c", "#f16913", "#d94801", "#8c2d04"],
+			8: ["#fff5eb", "#fee6ce", "#fdd0a2", "#fdae6b", "#fd8d3c", "#f16913", "#d94801", "#8c2d04"],
+			9: ["#fff5eb", "#fee6ce", "#fdd0a2", "#fdae6b", "#fd8d3c", "#f16913", "#d94801", "#a63603", "#7f2704"]
 		},
 		Reds: {
-		3: ["#fee0d2","#fc9272","#de2d26"],
-		4: ["#fee5d9","#fcae91","#fb6a4a","#cb181d"],
-		5: ["#fee5d9","#fcae91","#fb6a4a","#de2d26","#a50f15"],
-		6: ["#fee5d9","#fcbba1","#fc9272","#fb6a4a","#de2d26","#a50f15"],
-		7: ["#fee5d9","#fcbba1","#fc9272","#fb6a4a","#ef3b2c","#cb181d","#99000d"],
-		8: ["#fff5f0","#fee0d2","#fcbba1","#fc9272","#fb6a4a","#ef3b2c","#cb181d","#99000d"],
-		9: ["#fff5f0","#fee0d2","#fcbba1","#fc9272","#fb6a4a","#ef3b2c","#cb181d","#a50f15","#67000d"]
+			3: ["#fee0d2", "#fc9272", "#de2d26"],
+			4: ["#fee5d9", "#fcae91", "#fb6a4a", "#cb181d"],
+			5: ["#fee5d9", "#fcae91", "#fb6a4a", "#de2d26", "#a50f15"],
+			6: ["#fee5d9", "#fcbba1", "#fc9272", "#fb6a4a", "#de2d26", "#a50f15"],
+			7: ["#fee5d9", "#fcbba1", "#fc9272", "#fb6a4a", "#ef3b2c", "#cb181d", "#99000d"],
+			8: ["#fff5f0", "#fee0d2", "#fcbba1", "#fc9272", "#fb6a4a", "#ef3b2c", "#cb181d", "#99000d"],
+			9: ["#fff5f0", "#fee0d2", "#fcbba1", "#fc9272", "#fb6a4a", "#ef3b2c", "#cb181d", "#a50f15", "#67000d"]
 		},
 		Greys: {
-		3: ["#f0f0f0","#bdbdbd","#636363"],
-		4: ["#f7f7f7","#cccccc","#969696","#525252"],
-		5: ["#f7f7f7","#cccccc","#969696","#636363","#252525"],
-		6: ["#f7f7f7","#d9d9d9","#bdbdbd","#969696","#636363","#252525"],
-		7: ["#f7f7f7","#d9d9d9","#bdbdbd","#969696","#737373","#525252","#252525"],
-		8: ["#ffffff","#f0f0f0","#d9d9d9","#bdbdbd","#969696","#737373","#525252","#252525"],
-		9: ["#ffffff","#f0f0f0","#d9d9d9","#bdbdbd","#969696","#737373","#525252","#252525","#000000"]
+			3: ["#f0f0f0", "#bdbdbd", "#636363"],
+			4: ["#f7f7f7", "#cccccc", "#969696", "#525252"],
+			5: ["#f7f7f7", "#cccccc", "#969696", "#636363", "#252525"],
+			6: ["#f7f7f7", "#d9d9d9", "#bdbdbd", "#969696", "#636363", "#252525"],
+			7: ["#f7f7f7", "#d9d9d9", "#bdbdbd", "#969696", "#737373", "#525252", "#252525"],
+			8: ["#ffffff", "#f0f0f0", "#d9d9d9", "#bdbdbd", "#969696", "#737373", "#525252", "#252525"],
+			9: ["#ffffff", "#f0f0f0", "#d9d9d9", "#bdbdbd", "#969696", "#737373", "#525252", "#252525", "#000000"]
 		}
 	},
 	Diverging: {
 		PuOr: {
-		3: ["#f1a340","#f7f7f7","#998ec3"],
-		4: ["#e66101","#fdb863","#b2abd2","#5e3c99"],
-		5: ["#e66101","#fdb863","#f7f7f7","#b2abd2","#5e3c99"],
-		6: ["#b35806","#f1a340","#fee0b6","#d8daeb","#998ec3","#542788"],
-		7: ["#b35806","#f1a340","#fee0b6","#f7f7f7","#d8daeb","#998ec3","#542788"],
-		8: ["#b35806","#e08214","#fdb863","#fee0b6","#d8daeb","#b2abd2","#8073ac","#542788"],
-		9: ["#b35806","#e08214","#fdb863","#fee0b6","#f7f7f7","#d8daeb","#b2abd2","#8073ac","#542788"],
-		10: ["#7f3b08","#b35806","#e08214","#fdb863","#fee0b6","#d8daeb","#b2abd2","#8073ac","#542788","#2d004b"],
-		11: ["#7f3b08","#b35806","#e08214","#fdb863","#fee0b6","#f7f7f7","#d8daeb","#b2abd2","#8073ac","#542788","#2d004b"]
+			3: ["#f1a340", "#f7f7f7", "#998ec3"],
+			4: ["#e66101", "#fdb863", "#b2abd2", "#5e3c99"],
+			5: ["#e66101", "#fdb863", "#f7f7f7", "#b2abd2", "#5e3c99"],
+			6: ["#b35806", "#f1a340", "#fee0b6", "#d8daeb", "#998ec3", "#542788"],
+			7: ["#b35806", "#f1a340", "#fee0b6", "#f7f7f7", "#d8daeb", "#998ec3", "#542788"],
+			8: ["#b35806", "#e08214", "#fdb863", "#fee0b6", "#d8daeb", "#b2abd2", "#8073ac", "#542788"],
+			9: ["#b35806", "#e08214", "#fdb863", "#fee0b6", "#f7f7f7", "#d8daeb", "#b2abd2", "#8073ac", "#542788"],
+			10: ["#7f3b08", "#b35806", "#e08214", "#fdb863", "#fee0b6", "#d8daeb", "#b2abd2", "#8073ac", "#542788", "#2d004b"],
+			11: ["#7f3b08", "#b35806", "#e08214", "#fdb863", "#fee0b6", "#f7f7f7", "#d8daeb", "#b2abd2", "#8073ac", "#542788", "#2d004b"]
 		},
 		BrBG: {
-		3: ["#d8b365","#f5f5f5","#5ab4ac"],
-		4: ["#a6611a","#dfc27d","#80cdc1","#018571"],
-		5: ["#a6611a","#dfc27d","#f5f5f5","#80cdc1","#018571"],
-		6: ["#8c510a","#d8b365","#f6e8c3","#c7eae5","#5ab4ac","#01665e"],
-		7: ["#8c510a","#d8b365","#f6e8c3","#f5f5f5","#c7eae5","#5ab4ac","#01665e"],
-		8: ["#8c510a","#bf812d","#dfc27d","#f6e8c3","#c7eae5","#80cdc1","#35978f","#01665e"],
-		9: ["#8c510a","#bf812d","#dfc27d","#f6e8c3","#f5f5f5","#c7eae5","#80cdc1","#35978f","#01665e"],
-		10: ["#543005","#8c510a","#bf812d","#dfc27d","#f6e8c3","#c7eae5","#80cdc1","#35978f","#01665e","#003c30"],
-		11: ["#543005","#8c510a","#bf812d","#dfc27d","#f6e8c3","#f5f5f5","#c7eae5","#80cdc1","#35978f","#01665e","#003c30"]
+			3: ["#d8b365", "#f5f5f5", "#5ab4ac"],
+			4: ["#a6611a", "#dfc27d", "#80cdc1", "#018571"],
+			5: ["#a6611a", "#dfc27d", "#f5f5f5", "#80cdc1", "#018571"],
+			6: ["#8c510a", "#d8b365", "#f6e8c3", "#c7eae5", "#5ab4ac", "#01665e"],
+			7: ["#8c510a", "#d8b365", "#f6e8c3", "#f5f5f5", "#c7eae5", "#5ab4ac", "#01665e"],
+			8: ["#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#c7eae5", "#80cdc1", "#35978f", "#01665e"],
+			9: ["#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#f5f5f5", "#c7eae5", "#80cdc1", "#35978f", "#01665e"],
+			10: ["#543005", "#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#c7eae5", "#80cdc1", "#35978f", "#01665e", "#003c30"],
+			11: ["#543005", "#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#f5f5f5", "#c7eae5", "#80cdc1", "#35978f", "#01665e", "#003c30"]
 		},
 		PRGn: {
-		3: ["#af8dc3","#f7f7f7","#7fbf7b"],
-		4: ["#7b3294","#c2a5cf","#a6dba0","#008837"],
-		5: ["#7b3294","#c2a5cf","#f7f7f7","#a6dba0","#008837"],
-		6: ["#762a83","#af8dc3","#e7d4e8","#d9f0d3","#7fbf7b","#1b7837"],
-		7: ["#762a83","#af8dc3","#e7d4e8","#f7f7f7","#d9f0d3","#7fbf7b","#1b7837"],
-		8: ["#762a83","#9970ab","#c2a5cf","#e7d4e8","#d9f0d3","#a6dba0","#5aae61","#1b7837"],
-		9: ["#762a83","#9970ab","#c2a5cf","#e7d4e8","#f7f7f7","#d9f0d3","#a6dba0","#5aae61","#1b7837"],
-		10: ["#40004b","#762a83","#9970ab","#c2a5cf","#e7d4e8","#d9f0d3","#a6dba0","#5aae61","#1b7837","#00441b"],
-		11: ["#40004b","#762a83","#9970ab","#c2a5cf","#e7d4e8","#f7f7f7","#d9f0d3","#a6dba0","#5aae61","#1b7837","#00441b"]
+			3: ["#af8dc3", "#f7f7f7", "#7fbf7b"],
+			4: ["#7b3294", "#c2a5cf", "#a6dba0", "#008837"],
+			5: ["#7b3294", "#c2a5cf", "#f7f7f7", "#a6dba0", "#008837"],
+			6: ["#762a83", "#af8dc3", "#e7d4e8", "#d9f0d3", "#7fbf7b", "#1b7837"],
+			7: ["#762a83", "#af8dc3", "#e7d4e8", "#f7f7f7", "#d9f0d3", "#7fbf7b", "#1b7837"],
+			8: ["#762a83", "#9970ab", "#c2a5cf", "#e7d4e8", "#d9f0d3", "#a6dba0", "#5aae61", "#1b7837"],
+			9: ["#762a83", "#9970ab", "#c2a5cf", "#e7d4e8", "#f7f7f7", "#d9f0d3", "#a6dba0", "#5aae61", "#1b7837"],
+			10: ["#40004b", "#762a83", "#9970ab", "#c2a5cf", "#e7d4e8", "#d9f0d3", "#a6dba0", "#5aae61", "#1b7837", "#00441b"],
+			11: ["#40004b", "#762a83", "#9970ab", "#c2a5cf", "#e7d4e8", "#f7f7f7", "#d9f0d3", "#a6dba0", "#5aae61", "#1b7837", "#00441b"]
 		},
 		PiYG: {
-		3: ["#e9a3c9","#f7f7f7","#a1d76a"],
-		4: ["#d01c8b","#f1b6da","#b8e186","#4dac26"],
-		5: ["#d01c8b","#f1b6da","#f7f7f7","#b8e186","#4dac26"],
-		6: ["#c51b7d","#e9a3c9","#fde0ef","#e6f5d0","#a1d76a","#4d9221"],
-		7: ["#c51b7d","#e9a3c9","#fde0ef","#f7f7f7","#e6f5d0","#a1d76a","#4d9221"],
-		8: ["#c51b7d","#de77ae","#f1b6da","#fde0ef","#e6f5d0","#b8e186","#7fbc41","#4d9221"],
-		9: ["#c51b7d","#de77ae","#f1b6da","#fde0ef","#f7f7f7","#e6f5d0","#b8e186","#7fbc41","#4d9221"],
-		10: ["#8e0152","#c51b7d","#de77ae","#f1b6da","#fde0ef","#e6f5d0","#b8e186","#7fbc41","#4d9221","#276419"],
-		11: ["#8e0152","#c51b7d","#de77ae","#f1b6da","#fde0ef","#f7f7f7","#e6f5d0","#b8e186","#7fbc41","#4d9221","#276419"]
+			3: ["#e9a3c9", "#f7f7f7", "#a1d76a"],
+			4: ["#d01c8b", "#f1b6da", "#b8e186", "#4dac26"],
+			5: ["#d01c8b", "#f1b6da", "#f7f7f7", "#b8e186", "#4dac26"],
+			6: ["#c51b7d", "#e9a3c9", "#fde0ef", "#e6f5d0", "#a1d76a", "#4d9221"],
+			7: ["#c51b7d", "#e9a3c9", "#fde0ef", "#f7f7f7", "#e6f5d0", "#a1d76a", "#4d9221"],
+			8: ["#c51b7d", "#de77ae", "#f1b6da", "#fde0ef", "#e6f5d0", "#b8e186", "#7fbc41", "#4d9221"],
+			9: ["#c51b7d", "#de77ae", "#f1b6da", "#fde0ef", "#f7f7f7", "#e6f5d0", "#b8e186", "#7fbc41", "#4d9221"],
+			10: ["#8e0152", "#c51b7d", "#de77ae", "#f1b6da", "#fde0ef", "#e6f5d0", "#b8e186", "#7fbc41", "#4d9221", "#276419"],
+			11: ["#8e0152", "#c51b7d", "#de77ae", "#f1b6da", "#fde0ef", "#f7f7f7", "#e6f5d0", "#b8e186", "#7fbc41", "#4d9221", "#276419"]
 		},
 		RdBu: {
-		3: ["#ef8a62","#f7f7f7","#67a9cf"],
-		4: ["#ca0020","#f4a582","#92c5de","#0571b0"],
-		5: ["#ca0020","#f4a582","#f7f7f7","#92c5de","#0571b0"],
-		6: ["#b2182b","#ef8a62","#fddbc7","#d1e5f0","#67a9cf","#2166ac"],
-		7: ["#b2182b","#ef8a62","#fddbc7","#f7f7f7","#d1e5f0","#67a9cf","#2166ac"],
-		8: ["#b2182b","#d6604d","#f4a582","#fddbc7","#d1e5f0","#92c5de","#4393c3","#2166ac"],
-		9: ["#b2182b","#d6604d","#f4a582","#fddbc7","#f7f7f7","#d1e5f0","#92c5de","#4393c3","#2166ac"],
-		10: ["#67001f","#b2182b","#d6604d","#f4a582","#fddbc7","#d1e5f0","#92c5de","#4393c3","#2166ac","#053061"],
-		11: ["#67001f","#b2182b","#d6604d","#f4a582","#fddbc7","#f7f7f7","#d1e5f0","#92c5de","#4393c3","#2166ac","#053061"]
+			3: ["#ef8a62", "#f7f7f7", "#67a9cf"],
+			4: ["#ca0020", "#f4a582", "#92c5de", "#0571b0"],
+			5: ["#ca0020", "#f4a582", "#f7f7f7", "#92c5de", "#0571b0"],
+			6: ["#b2182b", "#ef8a62", "#fddbc7", "#d1e5f0", "#67a9cf", "#2166ac"],
+			7: ["#b2182b", "#ef8a62", "#fddbc7", "#f7f7f7", "#d1e5f0", "#67a9cf", "#2166ac"],
+			8: ["#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#d1e5f0", "#92c5de", "#4393c3", "#2166ac"],
+			9: ["#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#f7f7f7", "#d1e5f0", "#92c5de", "#4393c3", "#2166ac"],
+			10: ["#67001f", "#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#d1e5f0", "#92c5de", "#4393c3", "#2166ac", "#053061"],
+			11: ["#67001f", "#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#f7f7f7", "#d1e5f0", "#92c5de", "#4393c3", "#2166ac", "#053061"]
 		},
 		RdGy: {
-		3: ["#ef8a62","#ffffff","#999999"],
-		4: ["#ca0020","#f4a582","#bababa","#404040"],
-		5: ["#ca0020","#f4a582","#ffffff","#bababa","#404040"],
-		6: ["#b2182b","#ef8a62","#fddbc7","#e0e0e0","#999999","#4d4d4d"],
-		7: ["#b2182b","#ef8a62","#fddbc7","#ffffff","#e0e0e0","#999999","#4d4d4d"],
-		8: ["#b2182b","#d6604d","#f4a582","#fddbc7","#e0e0e0","#bababa","#878787","#4d4d4d"],
-		9: ["#b2182b","#d6604d","#f4a582","#fddbc7","#ffffff","#e0e0e0","#bababa","#878787","#4d4d4d"],
-		10: ["#67001f","#b2182b","#d6604d","#f4a582","#fddbc7","#e0e0e0","#bababa","#878787","#4d4d4d","#1a1a1a"],
-		11: ["#67001f","#b2182b","#d6604d","#f4a582","#fddbc7","#ffffff","#e0e0e0","#bababa","#878787","#4d4d4d","#1a1a1a"]
+			3: ["#ef8a62", "#ffffff", "#999999"],
+			4: ["#ca0020", "#f4a582", "#bababa", "#404040"],
+			5: ["#ca0020", "#f4a582", "#ffffff", "#bababa", "#404040"],
+			6: ["#b2182b", "#ef8a62", "#fddbc7", "#e0e0e0", "#999999", "#4d4d4d"],
+			7: ["#b2182b", "#ef8a62", "#fddbc7", "#ffffff", "#e0e0e0", "#999999", "#4d4d4d"],
+			8: ["#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#e0e0e0", "#bababa", "#878787", "#4d4d4d"],
+			9: ["#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#ffffff", "#e0e0e0", "#bababa", "#878787", "#4d4d4d"],
+			10: ["#67001f", "#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#e0e0e0", "#bababa", "#878787", "#4d4d4d", "#1a1a1a"],
+			11: ["#67001f", "#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#ffffff", "#e0e0e0", "#bababa", "#878787", "#4d4d4d", "#1a1a1a"]
 		},
 		RdYlBu: {
-		3: ["#fc8d59","#ffffbf","#91bfdb"],
-		4: ["#d7191c","#fdae61","#abd9e9","#2c7bb6"],
-		5: ["#d7191c","#fdae61","#ffffbf","#abd9e9","#2c7bb6"],
-		6: ["#d73027","#fc8d59","#fee090","#e0f3f8","#91bfdb","#4575b4"],
-		7: ["#d73027","#fc8d59","#fee090","#ffffbf","#e0f3f8","#91bfdb","#4575b4"],
-		8: ["#d73027","#f46d43","#fdae61","#fee090","#e0f3f8","#abd9e9","#74add1","#4575b4"],
-		9: ["#d73027","#f46d43","#fdae61","#fee090","#ffffbf","#e0f3f8","#abd9e9","#74add1","#4575b4"],
-		10: ["#a50026","#d73027","#f46d43","#fdae61","#fee090","#e0f3f8","#abd9e9","#74add1","#4575b4","#313695"],
-		11: ["#a50026","#d73027","#f46d43","#fdae61","#fee090","#ffffbf","#e0f3f8","#abd9e9","#74add1","#4575b4","#313695"]
+			3: ["#fc8d59", "#ffffbf", "#91bfdb"],
+			4: ["#d7191c", "#fdae61", "#abd9e9", "#2c7bb6"],
+			5: ["#d7191c", "#fdae61", "#ffffbf", "#abd9e9", "#2c7bb6"],
+			6: ["#d73027", "#fc8d59", "#fee090", "#e0f3f8", "#91bfdb", "#4575b4"],
+			7: ["#d73027", "#fc8d59", "#fee090", "#ffffbf", "#e0f3f8", "#91bfdb", "#4575b4"],
+			8: ["#d73027", "#f46d43", "#fdae61", "#fee090", "#e0f3f8", "#abd9e9", "#74add1", "#4575b4"],
+			9: ["#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf", "#e0f3f8", "#abd9e9", "#74add1", "#4575b4"],
+			10: ["#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#e0f3f8", "#abd9e9", "#74add1", "#4575b4", "#313695"],
+			11: ["#a50026", "#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf", "#e0f3f8", "#abd9e9", "#74add1", "#4575b4", "#313695"]
 		},
 		Spectral: {
-		3: ["#fc8d59","#ffffbf","#99d594"],
-		4: ["#d7191c","#fdae61","#abdda4","#2b83ba"],
-		5: ["#d7191c","#fdae61","#ffffbf","#abdda4","#2b83ba"],
-		6: ["#d53e4f","#fc8d59","#fee08b","#e6f598","#99d594","#3288bd"],
-		7: ["#d53e4f","#fc8d59","#fee08b","#ffffbf","#e6f598","#99d594","#3288bd"],
-		8: ["#d53e4f","#f46d43","#fdae61","#fee08b","#e6f598","#abdda4","#66c2a5","#3288bd"],
-		9: ["#d53e4f","#f46d43","#fdae61","#fee08b","#ffffbf","#e6f598","#abdda4","#66c2a5","#3288bd"],
-		10: ["#9e0142","#d53e4f","#f46d43","#fdae61","#fee08b","#e6f598","#abdda4","#66c2a5","#3288bd","#5e4fa2"],
-		11: ["#9e0142","#d53e4f","#f46d43","#fdae61","#fee08b","#ffffbf","#e6f598","#abdda4","#66c2a5","#3288bd","#5e4fa2"]
+			3: ["#fc8d59", "#ffffbf", "#99d594"],
+			4: ["#d7191c", "#fdae61", "#abdda4", "#2b83ba"],
+			5: ["#d7191c", "#fdae61", "#ffffbf", "#abdda4", "#2b83ba"],
+			6: ["#d53e4f", "#fc8d59", "#fee08b", "#e6f598", "#99d594", "#3288bd"],
+			7: ["#d53e4f", "#fc8d59", "#fee08b", "#ffffbf", "#e6f598", "#99d594", "#3288bd"],
+			8: ["#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#e6f598", "#abdda4", "#66c2a5", "#3288bd"],
+			9: ["#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#ffffbf", "#e6f598", "#abdda4", "#66c2a5", "#3288bd"],
+			10: ["#9e0142", "#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#e6f598", "#abdda4", "#66c2a5", "#3288bd", "#5e4fa2"],
+			11: ["#9e0142", "#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#ffffbf", "#e6f598", "#abdda4", "#66c2a5", "#3288bd", "#5e4fa2"]
 		},
 		RdYlGn: {
-		3: ["#fc8d59","#ffffbf","#91cf60"],
-		4: ["#d7191c","#fdae61","#a6d96a","#1a9641"],
-		5: ["#d7191c","#fdae61","#ffffbf","#a6d96a","#1a9641"],
-		6: ["#d73027","#fc8d59","#fee08b","#d9ef8b","#91cf60","#1a9850"],
-		7: ["#d73027","#fc8d59","#fee08b","#ffffbf","#d9ef8b","#91cf60","#1a9850"],
-		8: ["#d73027","#f46d43","#fdae61","#fee08b","#d9ef8b","#a6d96a","#66bd63","#1a9850"],
-		9: ["#d73027","#f46d43","#fdae61","#fee08b","#ffffbf","#d9ef8b","#a6d96a","#66bd63","#1a9850"],
-		10: ["#a50026","#d73027","#f46d43","#fdae61","#fee08b","#d9ef8b","#a6d96a","#66bd63","#1a9850","#006837"],
-		11: ["#a50026","#d73027","#f46d43","#fdae61","#fee08b","#ffffbf","#d9ef8b","#a6d96a","#66bd63","#1a9850","#006837"]
+			3: ["#fc8d59", "#ffffbf", "#91cf60"],
+			4: ["#d7191c", "#fdae61", "#a6d96a", "#1a9641"],
+			5: ["#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"],
+			6: ["#d73027", "#fc8d59", "#fee08b", "#d9ef8b", "#91cf60", "#1a9850"],
+			7: ["#d73027", "#fc8d59", "#fee08b", "#ffffbf", "#d9ef8b", "#91cf60", "#1a9850"],
+			8: ["#d73027", "#f46d43", "#fdae61", "#fee08b", "#d9ef8b", "#a6d96a", "#66bd63", "#1a9850"],
+			9: ["#d73027", "#f46d43", "#fdae61", "#fee08b", "#ffffbf", "#d9ef8b", "#a6d96a", "#66bd63", "#1a9850"],
+			10: ["#a50026", "#d73027", "#f46d43", "#fdae61", "#fee08b", "#d9ef8b", "#a6d96a", "#66bd63", "#1a9850", "#006837"],
+			11: ["#a50026", "#d73027", "#f46d43", "#fdae61", "#fee08b", "#ffffbf", "#d9ef8b", "#a6d96a", "#66bd63", "#1a9850", "#006837"]
 		}
 	},
 	Qualitative: {
 		Accent: {
-		3: ["#7fc97f","#beaed4","#fdc086"],
-		4: ["#7fc97f","#beaed4","#fdc086","#ffff99"],
-		5: ["#7fc97f","#beaed4","#fdc086","#ffff99","#386cb0"],
-		6: ["#7fc97f","#beaed4","#fdc086","#ffff99","#386cb0","#f0027f"],
-		7: ["#7fc97f","#beaed4","#fdc086","#ffff99","#386cb0","#f0027f","#bf5b17"],
-		8: ["#7fc97f","#beaed4","#fdc086","#ffff99","#386cb0","#f0027f","#bf5b17","#666666"]
+			3: ["#7fc97f", "#beaed4", "#fdc086"],
+			4: ["#7fc97f", "#beaed4", "#fdc086", "#ffff99"],
+			5: ["#7fc97f", "#beaed4", "#fdc086", "#ffff99", "#386cb0"],
+			6: ["#7fc97f", "#beaed4", "#fdc086", "#ffff99", "#386cb0", "#f0027f"],
+			7: ["#7fc97f", "#beaed4", "#fdc086", "#ffff99", "#386cb0", "#f0027f", "#bf5b17"],
+			8: ["#7fc97f", "#beaed4", "#fdc086", "#ffff99", "#386cb0", "#f0027f", "#bf5b17", "#666666"]
 		},
 		Dark2: {
-		3: ["#1b9e77","#d95f02","#7570b3"],
-		4: ["#1b9e77","#d95f02","#7570b3","#e7298a"],
-		5: ["#1b9e77","#d95f02","#7570b3","#e7298a","#66a61e"],
-		6: ["#1b9e77","#d95f02","#7570b3","#e7298a","#66a61e","#e6ab02"],
-		7: ["#1b9e77","#d95f02","#7570b3","#e7298a","#66a61e","#e6ab02","#a6761d"],
-		8: ["#1b9e77","#d95f02","#7570b3","#e7298a","#66a61e","#e6ab02","#a6761d","#666666"]
+			3: ["#1b9e77", "#d95f02", "#7570b3"],
+			4: ["#1b9e77", "#d95f02", "#7570b3", "#e7298a"],
+			5: ["#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e"],
+			6: ["#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02"],
+			7: ["#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d"],
+			8: ["#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666"]
 		},
 		Paired: {
-		3: ["#a6cee3","#1f78b4","#b2df8a"],
-		4: ["#a6cee3","#1f78b4","#b2df8a","#33a02c"],
-		5: ["#a6cee3","#1f78b4","#b2df8a","#33a02c","#fb9a99"],
-		6: ["#a6cee3","#1f78b4","#b2df8a","#33a02c","#fb9a99","#e31a1c"],
-		7: ["#a6cee3","#1f78b4","#b2df8a","#33a02c","#fb9a99","#e31a1c","#fdbf6f"],
-		8: ["#a6cee3","#1f78b4","#b2df8a","#33a02c","#fb9a99","#e31a1c","#fdbf6f","#ff7f00"],
-		9: ["#a6cee3","#1f78b4","#b2df8a","#33a02c","#fb9a99","#e31a1c","#fdbf6f","#ff7f00","#cab2d6"],
-		10: ["#a6cee3","#1f78b4","#b2df8a","#33a02c","#fb9a99","#e31a1c","#fdbf6f","#ff7f00","#cab2d6","#6a3d9a"],
-		11: ["#a6cee3","#1f78b4","#b2df8a","#33a02c","#fb9a99","#e31a1c","#fdbf6f","#ff7f00","#cab2d6","#6a3d9a","#ffff99"],
-		12: ["#a6cee3","#1f78b4","#b2df8a","#33a02c","#fb9a99","#e31a1c","#fdbf6f","#ff7f00","#cab2d6","#6a3d9a","#ffff99","#b15928"]
+			3: ["#a6cee3", "#1f78b4", "#b2df8a"],
+			4: ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c"],
+			5: ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99"],
+			6: ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c"],
+			7: ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f"],
+			8: ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00"],
+			9: ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6"],
+			10: ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a"],
+			11: ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a", "#ffff99"],
+			12: ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a", "#ffff99", "#b15928"]
 		},
 		Pastel1: {
-		3: ["#fbb4ae","#b3cde3","#ccebc5"],
-		4: ["#fbb4ae","#b3cde3","#ccebc5","#decbe4"],
-		5: ["#fbb4ae","#b3cde3","#ccebc5","#decbe4","#fed9a6"],
-		6: ["#fbb4ae","#b3cde3","#ccebc5","#decbe4","#fed9a6","#ffffcc"],
-		7: ["#fbb4ae","#b3cde3","#ccebc5","#decbe4","#fed9a6","#ffffcc","#e5d8bd"],
-		8: ["#fbb4ae","#b3cde3","#ccebc5","#decbe4","#fed9a6","#ffffcc","#e5d8bd","#fddaec"],
-		9: ["#fbb4ae","#b3cde3","#ccebc5","#decbe4","#fed9a6","#ffffcc","#e5d8bd","#fddaec","#f2f2f2"]
+			3: ["#fbb4ae", "#b3cde3", "#ccebc5"],
+			4: ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4"],
+			5: ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4", "#fed9a6"],
+			6: ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4", "#fed9a6", "#ffffcc"],
+			7: ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4", "#fed9a6", "#ffffcc", "#e5d8bd"],
+			8: ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4", "#fed9a6", "#ffffcc", "#e5d8bd", "#fddaec"],
+			9: ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4", "#fed9a6", "#ffffcc", "#e5d8bd", "#fddaec", "#f2f2f2"]
 		},
 		Pastel2: {
-		3: ["#b3e2cd","#fdcdac","#cbd5e8"],
-		4: ["#b3e2cd","#fdcdac","#cbd5e8","#f4cae4"],
-		5: ["#b3e2cd","#fdcdac","#cbd5e8","#f4cae4","#e6f5c9"],
-		6: ["#b3e2cd","#fdcdac","#cbd5e8","#f4cae4","#e6f5c9","#fff2ae"],
-		7: ["#b3e2cd","#fdcdac","#cbd5e8","#f4cae4","#e6f5c9","#fff2ae","#f1e2cc"],
-		8: ["#b3e2cd","#fdcdac","#cbd5e8","#f4cae4","#e6f5c9","#fff2ae","#f1e2cc","#cccccc"]
+			3: ["#b3e2cd", "#fdcdac", "#cbd5e8"],
+			4: ["#b3e2cd", "#fdcdac", "#cbd5e8", "#f4cae4"],
+			5: ["#b3e2cd", "#fdcdac", "#cbd5e8", "#f4cae4", "#e6f5c9"],
+			6: ["#b3e2cd", "#fdcdac", "#cbd5e8", "#f4cae4", "#e6f5c9", "#fff2ae"],
+			7: ["#b3e2cd", "#fdcdac", "#cbd5e8", "#f4cae4", "#e6f5c9", "#fff2ae", "#f1e2cc"],
+			8: ["#b3e2cd", "#fdcdac", "#cbd5e8", "#f4cae4", "#e6f5c9", "#fff2ae", "#f1e2cc", "#cccccc"]
 		},
 		Set1: {
-		3: ["#e41a1c","#377eb8","#4daf4a"],
-		4: ["#e41a1c","#377eb8","#4daf4a","#984ea3"],
-		5: ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00"],
-		6: ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#ffff33"],
-		7: ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#ffff33","#a65628"],
-		8: ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#ffff33","#a65628","#f781bf"],
-		9: ["#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00","#ffff33","#a65628","#f781bf","#999999"]
+			3: ["#e41a1c", "#377eb8", "#4daf4a"],
+			4: ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3"],
+			5: ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00"],
+			6: ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33"],
+			7: ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628"],
+			8: ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628", "#f781bf"],
+			9: ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628", "#f781bf", "#999999"]
 		},
 		Set2: {
-		3: ["#66c2a5","#fc8d62","#8da0cb"],
-		4: ["#66c2a5","#fc8d62","#8da0cb","#e78ac3"],
-		5: ["#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854"],
-		6: ["#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f"],
-		7: ["#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f","#e5c494"],
-		8: ["#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f","#e5c494","#b3b3b3"]
+			3: ["#66c2a5", "#fc8d62", "#8da0cb"],
+			4: ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3"],
+			5: ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854"],
+			6: ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854", "#ffd92f"],
+			7: ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854", "#ffd92f", "#e5c494"],
+			8: ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854", "#ffd92f", "#e5c494", "#b3b3b3"]
 		},
 		Set3: {
-		3: ["#8dd3c7","#ffffb3","#bebada"],
-		4: ["#8dd3c7","#ffffb3","#bebada","#fb8072"],
-		5: ["#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3"],
-		6: ["#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3","#fdb462"],
-		7: ["#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3","#fdb462","#b3de69"],
-		8: ["#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3","#fdb462","#b3de69","#fccde5"],
-		9: ["#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3","#fdb462","#b3de69","#fccde5","#d9d9d9"],
-		10: ["#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3","#fdb462","#b3de69","#fccde5","#d9d9d9","#bc80bd"],
-		11: ["#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3","#fdb462","#b3de69","#fccde5","#d9d9d9","#bc80bd","#ccebc5"],
-		12: ["#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3","#fdb462","#b3de69","#fccde5","#d9d9d9","#bc80bd","#ccebc5","#ffed6f"]
+			3: ["#8dd3c7", "#ffffb3", "#bebada"],
+			4: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072"],
+			5: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3"],
+			6: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462"],
+			7: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69"],
+			8: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5"],
+			9: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5", "#d9d9d9"],
+			10: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5", "#d9d9d9", "#bc80bd"],
+			11: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5", "#d9d9d9", "#bc80bd", "#ccebc5"],
+			12: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5", "#d9d9d9", "#bc80bd", "#ccebc5", "#ffed6f"]
 		}
 	}
 };
@@ -2360,7 +2372,8 @@ L.DynamicPaletteElement = L.Class.extend({
 	}
 
 });
-;/*
+;
+/*
  * Draws a regular polygon on the map given a radius in meters
  */
 L.RegularPolygon = L.Polygon.extend({
@@ -2368,14 +2381,14 @@ L.RegularPolygon = L.Polygon.extend({
 		R: 6378.137,
 		M_PER_KM: 1000
 	},
-	
+
 	initialize: function (centerLatLng, options) {
 		this._centerLatLng = centerLatLng;
 
 		L.Util.setOptions(this, options);
 		L.Polygon.prototype.initialize.call(this, this._getLatLngs(), options);
 	},
-	
+
 	options: {
 		fill: true,
 		radius: 1000.0,
@@ -2383,17 +2396,17 @@ L.RegularPolygon = L.Polygon.extend({
 		rotation: 0.0,
 		maxDegrees: 360
 	},
-	
+
 	getLatLng: function () {
 		return this._centerLatLng;
 	},
-	
+
 	setRadius: function (radius) {
 		this.options.radius = radius;
 		this._latlngs = this._getLatLngs();
 		this.redraw();
 	},
-	
+
 	_getLatLngs: function () {
 
 		var maxDegrees = this.options.maxDegrees || 360;
@@ -2402,47 +2415,47 @@ L.RegularPolygon = L.Polygon.extend({
 		var angle = this.options.rotation;
 		var latlngs = [];
 		var newLatLng;
-		
+
 		while (angle < degrees) {
 			// Calculate the point the radius meters away from the center point at the
 			// given angle;
 			newLatLng = this._getPoint(angle);
-			
+
 			// Add the point to the latlngs array
 			latlngs.push(newLatLng);
-			
+
 			// Increment the angle
 			angle += angleSize;
 		}
-		
+
 		return latlngs;
 	},
-	
+
 	// Get an end point that is the specified radius (in m) from the center point at the specified
 	// angle
 	_getPoint: function (angle) {
-		
+
 		var toRad = function (number) {
 			return number * L.LatLng.DEG_TO_RAD;
 		};
-		
+
 		var toDeg = function (number) {
 			return number * L.LatLng.RAD_TO_DEG;
 		};
-		
+
 		var angleRadians = toRad(angle);
 		var angularDistance = this.options.radius / L.RegularPolygon.M_PER_KM / L.RegularPolygon.R;
 		var lat1 = toRad(this._centerLatLng.lat);
 		var lon1 = toRad(this._centerLatLng.lng);
 		var lat2 = Math.asin(Math.sin(lat1) * Math.cos(angularDistance) + Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(angleRadians));
 		var lon2 = lon1 + Math.atan2(Math.sin(angleRadians) * Math.sin(angularDistance) * Math.cos(lat1), Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2));
-		
+
 		lat2 = toDeg(lat2);
 		lon2 = toDeg(lon2);
-		
+
 		return new L.LatLng(lat2, lon2);
 	},
-	
+
 	toGeoJSON: function () {
 		var feature = {
 			type: 'Feature',
@@ -2452,532 +2465,534 @@ L.RegularPolygon = L.Polygon.extend({
 			},
 			properties: this.options
 		};
-		
+
 		for (var i = 0; i < this._latlngs.length; ++i) {
 			var latlng = this._latlngs[i];
-			
+
 			feature.geometry.coordinates[0].push([latlng.lng, latlng.lat]);
 		}
-		
+
 		return feature;
 	}
 });
 
 L.regularPolygon = function (centerLatLng, options) {
 	return new L.RegularPolygon(centerLatLng, options);
-};;L.Path.XLINK_NS = 'http://www.w3.org/1999/xlink';
+};
+;
+L.Path.XLINK_NS = 'http://www.w3.org/1999/xlink';
 
 /*
  * Functions that support displaying text on an SVG path
  */
 var TextFunctions = TextFunctions || {
-	__updatePath: L.Path.prototype._updatePath,
+		__updatePath: L.Path.prototype._updatePath,
 
-	_updatePath: function () {
-		this.__updatePath.call(this);
+		_updatePath: function () {
+			this.__updatePath.call(this);
 
-		if (this.options.text) {
-			this._createText(this.options.text);
-		}
-	},
+			if (this.options.text) {
+				this._createText(this.options.text);
+			}
+		},
 
-	_initText: function () {
-		if (this.options.text) {
-			this._createText(this.options.text);
-		}
-	},
+		_initText: function () {
+			if (this.options.text) {
+				this._createText(this.options.text);
+			}
+		},
 
-	getTextAnchor: function () {
-		if (this._point) {
-			return this._point;
-		}
-	},
+		getTextAnchor: function () {
+			if (this._point) {
+				return this._point;
+			}
+		},
 
-	setTextAnchor: function (anchorPoint) {
-		if (this._text) {
-			this._text.setAttribute('x', anchorPoint.x);
-			this._text.setAttribute('y', anchorPoint.y);
-		}
-	},
+		setTextAnchor: function (anchorPoint) {
+			if (this._text) {
+				this._text.setAttribute('x', anchorPoint.x);
+				this._text.setAttribute('y', anchorPoint.y);
+			}
+		},
 
-	_createText: function (options) {
-		if (this._text) {
-			this._container.removeChild(this._text);
-		}
-
-		if (this._pathDef) {
-			this._defs.removeChild(this._pathDef);
-		}
-
-		// Set element style
-		var setStyle = function (element, style) {
-			var styleString = '';
-
-			for (var key in style) {
-				styleString += key + ': ' + style[key] + ';';
+		_createText: function (options) {
+			if (this._text) {
+				this._container.removeChild(this._text);
 			}
 
-			element.setAttribute('style', styleString);
-
-			return element;
-		};
-
-		// Set attributes for an element
-		var setAttr = function (element, attr) {
-			for (var key in attr) {
-				element.setAttribute(key, attr[key]);
+			if (this._pathDef) {
+				this._defs.removeChild(this._pathDef);
 			}
 
-			return element;
-		};
+			// Set element style
+			var setStyle = function (element, style) {
+				var styleString = '';
 
-		this._text = this._createElement('text');
+				for (var key in style) {
+					styleString += key + ': ' + style[key] + ';';
+				}
 
-		var textNode = document.createTextNode(options.text);
+				element.setAttribute('style', styleString);
 
-		// If path is true, then create a textPath element and append it
-		// to the text element; otherwise, populate the text element with a text node
-		if (options.path) {
+				return element;
+			};
 
-			var pathOptions = options.path;
+			// Set attributes for an element
+			var setAttr = function (element, attr) {
+				for (var key in attr) {
+					element.setAttribute(key, attr[key]);
+				}
 
-			// Generate and set an id for the path - the textPath element will reference this id
-			var pathID = L.Util.guid();
+				return element;
+			};
 
-			var clonedPath = this._createElement('path');
-			clonedPath.setAttribute('d', this._path.getAttribute('d'));
-			clonedPath.setAttribute('id', pathID);
+			this._text = this._createElement('text');
 
-			if (!this._defs) {
-				this._defs = this._createElement('defs');
-				this._container.appendChild(this._defs);
+			var textNode = document.createTextNode(options.text);
+
+			// If path is true, then create a textPath element and append it
+			// to the text element; otherwise, populate the text element with a text node
+			if (options.path) {
+
+				var pathOptions = options.path;
+
+				// Generate and set an id for the path - the textPath element will reference this id
+				var pathID = L.Util.guid();
+
+				var clonedPath = this._createElement('path');
+				clonedPath.setAttribute('d', this._path.getAttribute('d'));
+				clonedPath.setAttribute('id', pathID);
+
+				if (!this._defs) {
+					this._defs = this._createElement('defs');
+					this._container.appendChild(this._defs);
+				}
+
+				this._defs.appendChild(clonedPath);
+				this._pathDef = clonedPath;
+
+				// Create the textPath element and add attributes to reference this path
+				var textPath = this._createElement('textPath');
+
+				if (pathOptions.startOffset) {
+					textPath.setAttribute('startOffset', pathOptions.startOffset);
+				}
+
+				if (pathOptions.attr) {
+					setAttr(textPath, pathOptions.attr);
+				}
+
+				if (pathOptions.style) {
+					setStyle(textPath, pathOptions.style);
+				}
+
+				textPath.setAttributeNS(L.Path.XLINK_NS, 'xlink:href', '#' + pathID);
+				textPath.appendChild(textNode);
+
+				// Add the textPath element to the text element
+				this._text.appendChild(textPath);
+			}
+			else {
+				this._text.appendChild(textNode);
+				var anchorPoint = this.getTextAnchor();
+				this.setTextAnchor(anchorPoint);
 			}
 
-			this._defs.appendChild(clonedPath);
-			this._pathDef = clonedPath;
-
-			// Create the textPath element and add attributes to reference this path
-			var textPath = this._createElement('textPath');
-
-			if (pathOptions.startOffset) {
-				textPath.setAttribute('startOffset', pathOptions.startOffset);
+			//className
+			if (options.className) {
+				this._text.setAttribute('class', options.className);
+			}
+			else {
+				this._text.setAttribute('class', 'leaflet-svg-text');
 			}
 
-			if (pathOptions.attr) {
-				setAttr(textPath, pathOptions.attr);
+			//attributes
+			if (options.attr) {
+				setAttr(this._text, options.attr);
 			}
 
-			if (pathOptions.style) {
-				setStyle(textPath, pathOptions.style);
+			//style
+			if (options.style) {
+				setStyle(this._text, options.style);
 			}
 
-			textPath.setAttributeNS(L.Path.XLINK_NS, 'xlink:href', '#' + pathID);
-			textPath.appendChild(textNode);
-
-			// Add the textPath element to the text element
-			this._text.appendChild(textPath);
+			this._container.appendChild(this._text);
 		}
-		else {
-			this._text.appendChild(textNode);
-			var anchorPoint = this.getTextAnchor();
-			this.setTextAnchor(anchorPoint);
-		}
-
-		//className
-		if (options.className) {
-			this._text.setAttribute('class', options.className);
-		}
-		else {
-			this._text.setAttribute('class', 'leaflet-svg-text');
-		}
-
-		//attributes
-		if (options.attr) {
-			setAttr(this._text, options.attr);
-		}
-
-		//style
-		if (options.style) {
-			setStyle(this._text, options.style);
-		}
-
-		this._container.appendChild(this._text);
-	}
-};
+	};
 
 /*
  * Functions that support additions to the basic SVG Path features provided by Leaflet
  */
 var PathFunctions = PathFunctions || {
-	__updateStyle: L.Path.prototype._updateStyle,
+		__updateStyle: L.Path.prototype._updateStyle,
 
-	_createDefs: function () {
-		this._defs = this._createElement('defs');
-		this._container.appendChild(this._defs);
-	},
+		_createDefs: function () {
+			this._defs = this._createElement('defs');
+			this._container.appendChild(this._defs);
+		},
 
-	_createGradient: function (options) {
-		if (!this._defs) {
-			this._createDefs();
-		}
-
-		if (this._gradient) {
-			this._defs.removeChild(this._gradient);
-		}
-
-		options = options !== true ? L.extend({}, options) : {};
-		var gradientGuid = L.Util.guid();
-		this._gradientGuid = gradientGuid;
-
-		var gradient;
-		var gradientOptions;
-		if (options.gradientType == "radial") {
-			gradient = this._createElement("radialGradient");
-			gradientOptions = options.radial || { cx: '50%', cy: '50%', r: '50%', fx: '50%', fy: '50%' };
-		} else {
-			gradient = this._createElement("linearGradient");
-			var vector = options.vector || [ [ "0%", "0%" ], [ "100%", "100%" ] ];
-			gradientOptions = {
-				x1: vector[0][0],
-				x2: vector[1][0],
-				y1: vector[0][1],
-				y2: vector[1][1]
-			};
-		}
-		gradientOptions.id = "grad" + gradientGuid;
-
-		var stops = options.stops || [
-			{
-				offset: '0%',
-				style: {
-					color: 'rgb(255, 255, 255)',
-					opacity: 1
-				}
-			},
-			{
-				offset: '60%',
-				style: {
-					color: this.options.fillColor || this.options.color,
-					opacity: 1
-				}
+		_createGradient: function (options) {
+			if (!this._defs) {
+				this._createDefs();
 			}
-		];
 
-		var key;
-		
-		for (key in gradientOptions) {
-			gradient.setAttribute(key, gradientOptions[key]);
-		}
+			if (this._gradient) {
+				this._defs.removeChild(this._gradient);
+			}
 
-		for (var i = 0; i < stops.length; ++i) {
-			var stop = stops[i];
-			var stopElement = this._createElement('stop');
+			options = options !== true ? L.extend({}, options) : {};
+			var gradientGuid = L.Util.guid();
+			this._gradientGuid = gradientGuid;
 
-			stop.style = stop.style || {};
+			var gradient;
+			var gradientOptions;
+			if (options.gradientType == "radial") {
+				gradient = this._createElement("radialGradient");
+				gradientOptions = options.radial || {cx: '50%', cy: '50%', r: '50%', fx: '50%', fy: '50%'};
+			} else {
+				gradient = this._createElement("linearGradient");
+				var vector = options.vector || [["0%", "0%"], ["100%", "100%"]];
+				gradientOptions = {
+					x1: vector[0][0],
+					x2: vector[1][0],
+					y1: vector[0][1],
+					y2: vector[1][1]
+				};
+			}
+			gradientOptions.id = "grad" + gradientGuid;
 
-			for (key in stop) {
-				var stopProperty = stop[key];
+			var stops = options.stops || [
+					{
+						offset: '0%',
+						style: {
+							color: 'rgb(255, 255, 255)',
+							opacity: 1
+						}
+					},
+					{
+						offset: '60%',
+						style: {
+							color: this.options.fillColor || this.options.color,
+							opacity: 1
+						}
+					}
+				];
 
-				if (key === 'style') {
-					var styleProperty = '';
+			var key;
 
-					stopProperty.color = stopProperty.color || (this.options.fillColor || this.options.color);
-					stopProperty.opacity = typeof stopProperty.opacity === 'undefined' ? 1 : stopProperty.opacity;
+			for (key in gradientOptions) {
+				gradient.setAttribute(key, gradientOptions[key]);
+			}
 
-					for (var propKey in stopProperty) {
-						styleProperty += 'stop-' + propKey + ':' + stopProperty[propKey] + ';';
+			for (var i = 0; i < stops.length; ++i) {
+				var stop = stops[i];
+				var stopElement = this._createElement('stop');
+
+				stop.style = stop.style || {};
+
+				for (key in stop) {
+					var stopProperty = stop[key];
+
+					if (key === 'style') {
+						var styleProperty = '';
+
+						stopProperty.color = stopProperty.color || (this.options.fillColor || this.options.color);
+						stopProperty.opacity = typeof stopProperty.opacity === 'undefined' ? 1 : stopProperty.opacity;
+
+						for (var propKey in stopProperty) {
+							styleProperty += 'stop-' + propKey + ':' + stopProperty[propKey] + ';';
+						}
+
+						stopProperty = styleProperty;
 					}
 
-					stopProperty = styleProperty;
+					stopElement.setAttribute(key, stopProperty);
 				}
 
-				stopElement.setAttribute(key, stopProperty);
+				gradient.appendChild(stopElement);
 			}
 
-			gradient.appendChild(stopElement);
-		}
+			this._gradient = gradient;
+			this._defs.appendChild(gradient);
+		},
 
-		this._gradient = gradient;
-		this._defs.appendChild(gradient);
-	},
+		_createDropShadow: function (options) {
 
-	_createDropShadow: function (options) {
-
-		if (!this._defs) {
-			this._createDefs();
-		}
-
-		if (this._dropShadow) {
-			this._defs.removeChild(this._dropShadow);
-		}
-
-		var filterGuid = L.Util.guid();
-		var filter = this._createElement('filter');
-		var feOffset = this._createElement('feOffset');
-		var feGaussianBlur = this._createElement('feGaussianBlur');
-		var feBlend = this._createElement('feBlend');
-
-		options = options || {
-			width: '200%',
-			height: '200%'
-		};
-
-		options.id = 'filter' + filterGuid;
-
-		var key;
-		
-		for (key in options) {
-			filter.setAttribute(key, options[key]);
-		}
-
-		var offsetOptions = {
-			result: 'offOut',
-			'in': 'SourceAlpha',
-			dx: '2',
-			dy: '2'
-		};
-
-		var blurOptions = {
-			result: 'blurOut',
-			'in': 'offOut',
-			stdDeviation: '2'
-		};
-
-		var blendOptions = {
-			'in': 'SourceGraphic',
-			in2: 'blurOut',
-			mode: 'lighten'
-		};
-
-		for (key in offsetOptions) {
-			feOffset.setAttribute(key, offsetOptions[key]);
-		}
-
-		for (key in blurOptions) {
-			feGaussianBlur.setAttribute(key, blurOptions[key]);
-		}
-
-		for (key in blendOptions) {
-			feBlend.setAttribute(key, blendOptions[key]);
-		}
-
-		filter.appendChild(feOffset);
-		filter.appendChild(feGaussianBlur);
-		filter.appendChild(feBlend);
-
-		this._dropShadow = filter;
-		this._defs.appendChild(filter);
-	},
-
-	_createCustomElement: function (tag, attributes) {
-		var element = this._createElement(tag);
-
-		for (var key in attributes) {
-			if (attributes.hasOwnProperty(key)) {
-				element.setAttribute(key, attributes[key]);
+			if (!this._defs) {
+				this._createDefs();
 			}
-		}
-		
-		return element;
-	},
 
-	_createImage: function (imageOptions) {
-		var image = this._createElement('image');
-		image.setAttribute('width', imageOptions.width);
-		image.setAttribute('height', imageOptions.height);
-		image.setAttribute('x', imageOptions.x || 0);
-		image.setAttribute('y', imageOptions.y || 0);
-        image.setAttributeNS(L.Path.XLINK_NS, 'xlink:href', imageOptions.url);
-
-		return image;
-	},
-
-	_createPattern: function (patternOptions) {
-		
-		if (this._pattern) {
-			this._defs.removeChild(this._pattern);
-		}
-		
-		var pattern = this._createCustomElement('pattern', patternOptions);
-		
-		this._pattern = pattern;
-		
-		return pattern;
-	},
-
-	_createShape: function (type, shapeOptions) {
-		if (this._shape) {
-			this._container.removeChild(this._shape);
-		}
-		
-		var shape = this._createCustomElement(type, shapeOptions);
-		
-		return shape;
-	},
-
-	// Override this in inheriting classes
-	_applyCustomStyles: function () {
-	},
-
-	_createFillPattern: function (imageOptions) {
-		var patternGuid = L.Util.guid();
-		var patternOptions = imageOptions.pattern;
-
-		patternOptions.id = patternGuid;
-		patternOptions.patternUnits = patternOptions.patternUnits || 'objectBoundingBox';
-
-		var pattern = this._createPattern(patternOptions);
-		var image = this._createImage(imageOptions.image);
-
-        image.setAttributeNS(L.Path.XLINK_NS, 'xlink:href', imageOptions.url);
-
-		pattern.appendChild(image);
-
-		if (!this._defs) {
-			this._createDefs();
-		}
-
-		this._defs.appendChild(pattern);
-		this._path.setAttribute('fill', 'url(#' + patternGuid + ')');
-	},
-
-	_getDefaultDiameter: function (radius) {
-		return 1.75 * radius;
-	},
-
-	// Added for image circle
-	_createShapeImage: function (imageOptions) {
-
-		imageOptions = imageOptions || {};
-
-		var patternGuid = L.Util.guid();
-
-		var radius = this.options.radius || Math.max(this.options.radiusX, this.options.radiusY);
-		var diameter = this._getDefaultDiameter(radius);
-		var imageSize = imageOptions.imageSize || new L.Point(diameter, diameter);
-
-		var circleSize = imageOptions.radius || diameter/2;
-
-		var shapeOptions = imageOptions.shape || {
-			circle: {
-				r: circleSize,
-				cx: 0,
-				cy: 0
+			if (this._dropShadow) {
+				this._defs.removeChild(this._dropShadow);
 			}
-		};
 
-		var patternOptions = imageOptions.pattern || {
-			width: imageSize.x,
-			height: imageSize.y,
-			x: 0,
-			y: 0
-		};
+			var filterGuid = L.Util.guid();
+			var filter = this._createElement('filter');
+			var feOffset = this._createElement('feOffset');
+			var feGaussianBlur = this._createElement('feGaussianBlur');
+			var feBlend = this._createElement('feBlend');
 
-		var shapeKeys = Object.keys(shapeOptions);
-		var shapeType = shapeKeys.length > 0 ? shapeKeys[0] : 'circle';
+			options = options || {
+					width: '200%',
+					height: '200%'
+				};
 
-		shapeOptions[shapeType].fill = 'url(#' + patternGuid + ')';
+			options.id = 'filter' + filterGuid;
 
-		var shape = this._createShape(shapeType, shapeOptions[shapeType]);
+			var key;
 
-		if (this.options.clickable) {
-			shape.setAttribute('class', 'leaflet-clickable');
-		}
+			for (key in options) {
+				filter.setAttribute(key, options[key]);
+			}
 
-		patternOptions.id = patternGuid;
-		patternOptions.patternUnits = patternOptions.patternUnits || 'objectBoundingBox';
+			var offsetOptions = {
+				result: 'offOut',
+				'in': 'SourceAlpha',
+				dx: '2',
+				dy: '2'
+			};
 
-		var pattern = this._createPattern(patternOptions);
+			var blurOptions = {
+				result: 'blurOut',
+				'in': 'offOut',
+				stdDeviation: '2'
+			};
 
-		imageOptions = imageOptions.image || {
-			width: imageSize.x,
-			height: imageSize.y,
-			x: 0,
-			y: 0,
-			url: this.options.imageCircleUrl
-		};
+			var blendOptions = {
+				'in': 'SourceGraphic',
+				in2: 'blurOut',
+				mode: 'lighten'
+			};
 
-		var image = this._createImage(imageOptions);
-        image.setAttributeNS(L.Path.XLINK_NS, 'xlink:href', imageOptions.url);
+			for (key in offsetOptions) {
+				feOffset.setAttribute(key, offsetOptions[key]);
+			}
 
-		pattern.appendChild(image);
-		this._defs.appendChild(pattern);
-		this._container.insertBefore(shape, this._defs);
+			for (key in blurOptions) {
+				feGaussianBlur.setAttribute(key, blurOptions[key]);
+			}
 
-		this._shape = shape;
-		
-		var me = this;
-		
-		this._shape.addEventListener('mouseover', function () {
-			me.fire('mouseover');
-		});
-		
-		this._shape.addEventListener('mouseout', function () {
-			me.fire('mouseout');
-		});
-		
-		this._shape.addEventListener('mousemove', function () {
-			me.fire('mousemove');
-		});
-		
-		var anchorPoint = this.getTextAnchor();
+			for (key in blendOptions) {
+				feBlend.setAttribute(key, blendOptions[key]);
+			}
 
-		if (this._shape && anchorPoint) {
-			if (this._shape.tagName === 'circle' || this._shape.tagName === 'ellipse') {
-				this._shape.setAttribute('cx', anchorPoint.x);
-				this._shape.setAttribute('cy', anchorPoint.y);
+			filter.appendChild(feOffset);
+			filter.appendChild(feGaussianBlur);
+			filter.appendChild(feBlend);
+
+			this._dropShadow = filter;
+			this._defs.appendChild(filter);
+		},
+
+		_createCustomElement: function (tag, attributes) {
+			var element = this._createElement(tag);
+
+			for (var key in attributes) {
+				if (attributes.hasOwnProperty(key)) {
+					element.setAttribute(key, attributes[key]);
+				}
+			}
+
+			return element;
+		},
+
+		_createImage: function (imageOptions) {
+			var image = this._createElement('image');
+			image.setAttribute('width', imageOptions.width);
+			image.setAttribute('height', imageOptions.height);
+			image.setAttribute('x', imageOptions.x || 0);
+			image.setAttribute('y', imageOptions.y || 0);
+			image.setAttributeNS(L.Path.XLINK_NS, 'xlink:href', imageOptions.url);
+
+			return image;
+		},
+
+		_createPattern: function (patternOptions) {
+
+			if (this._pattern) {
+				this._defs.removeChild(this._pattern);
+			}
+
+			var pattern = this._createCustomElement('pattern', patternOptions);
+
+			this._pattern = pattern;
+
+			return pattern;
+		},
+
+		_createShape: function (type, shapeOptions) {
+			if (this._shape) {
+				this._container.removeChild(this._shape);
+			}
+
+			var shape = this._createCustomElement(type, shapeOptions);
+
+			return shape;
+		},
+
+		// Override this in inheriting classes
+		_applyCustomStyles: function () {
+		},
+
+		_createFillPattern: function (imageOptions) {
+			var patternGuid = L.Util.guid();
+			var patternOptions = imageOptions.pattern;
+
+			patternOptions.id = patternGuid;
+			patternOptions.patternUnits = patternOptions.patternUnits || 'objectBoundingBox';
+
+			var pattern = this._createPattern(patternOptions);
+			var image = this._createImage(imageOptions.image);
+
+			image.setAttributeNS(L.Path.XLINK_NS, 'xlink:href', imageOptions.url);
+
+			pattern.appendChild(image);
+
+			if (!this._defs) {
+				this._createDefs();
+			}
+
+			this._defs.appendChild(pattern);
+			this._path.setAttribute('fill', 'url(#' + patternGuid + ')');
+		},
+
+		_getDefaultDiameter: function (radius) {
+			return 1.75 * radius;
+		},
+
+		// Added for image circle
+		_createShapeImage: function (imageOptions) {
+
+			imageOptions = imageOptions || {};
+
+			var patternGuid = L.Util.guid();
+
+			var radius = this.options.radius || Math.max(this.options.radiusX, this.options.radiusY);
+			var diameter = this._getDefaultDiameter(radius);
+			var imageSize = imageOptions.imageSize || new L.Point(diameter, diameter);
+
+			var circleSize = imageOptions.radius || diameter / 2;
+
+			var shapeOptions = imageOptions.shape || {
+					circle: {
+						r: circleSize,
+						cx: 0,
+						cy: 0
+					}
+				};
+
+			var patternOptions = imageOptions.pattern || {
+					width: imageSize.x,
+					height: imageSize.y,
+					x: 0,
+					y: 0
+				};
+
+			var shapeKeys = Object.keys(shapeOptions);
+			var shapeType = shapeKeys.length > 0 ? shapeKeys[0] : 'circle';
+
+			shapeOptions[shapeType].fill = 'url(#' + patternGuid + ')';
+
+			var shape = this._createShape(shapeType, shapeOptions[shapeType]);
+
+			if (this.options.clickable) {
+				shape.setAttribute('class', 'leaflet-clickable');
+			}
+
+			patternOptions.id = patternGuid;
+			patternOptions.patternUnits = patternOptions.patternUnits || 'objectBoundingBox';
+
+			var pattern = this._createPattern(patternOptions);
+
+			imageOptions = imageOptions.image || {
+					width: imageSize.x,
+					height: imageSize.y,
+					x: 0,
+					y: 0,
+					url: this.options.imageCircleUrl
+				};
+
+			var image = this._createImage(imageOptions);
+			image.setAttributeNS(L.Path.XLINK_NS, 'xlink:href', imageOptions.url);
+
+			pattern.appendChild(image);
+			this._defs.appendChild(pattern);
+			this._container.insertBefore(shape, this._defs);
+
+			this._shape = shape;
+
+			var me = this;
+
+			this._shape.addEventListener('mouseover', function () {
+				me.fire('mouseover');
+			});
+
+			this._shape.addEventListener('mouseout', function () {
+				me.fire('mouseout');
+			});
+
+			this._shape.addEventListener('mousemove', function () {
+				me.fire('mousemove');
+			});
+
+			var anchorPoint = this.getTextAnchor();
+
+			if (this._shape && anchorPoint) {
+				if (this._shape.tagName === 'circle' || this._shape.tagName === 'ellipse') {
+					this._shape.setAttribute('cx', anchorPoint.x);
+					this._shape.setAttribute('cy', anchorPoint.y);
+				}
+				else {
+					var width = this._shape.getAttribute('width');
+					var height = this._shape.getAttribute('height');
+					this._shape.setAttribute('x', anchorPoint.x - Number(width) / 2);
+					this._shape.setAttribute('y', anchorPoint.y - Number(height) / 2);
+				}
+			}
+		},
+
+		_updateStyle: function (layer) {
+			this.__updateStyle.call(this, layer);
+
+			var context = layer ? layer : this;
+
+			if (context.options.stroke) {
+				if (context.options.lineCap) {
+					context._path.setAttribute('stroke-linecap', context.options.lineCap);
+				}
+
+				if (context.options.lineJoin) {
+					context._path.setAttribute('stroke-linejoin', context.options.lineJoin);
+				}
+			}
+
+			if (context.options.gradient) {
+				context._createGradient(context.options.gradient);
+
+				context._path.setAttribute('fill', 'url(#' + context._gradient.getAttribute('id') + ')');
+			}
+			else if (!context.options.fill) {
+				context._path.setAttribute('fill', 'none');
+			}
+
+			if (context.options.dropShadow) {
+				context._createDropShadow();
+
+				context._path.setAttribute('filter', 'url(#' + context._dropShadow.getAttribute('id') + ')');
 			}
 			else {
-				var width = this._shape.getAttribute('width');
-				var height = this._shape.getAttribute('height');
-				this._shape.setAttribute('x', anchorPoint.x - Number(width)/2);
-				this._shape.setAttribute('y', anchorPoint.y - Number(height)/2);
-			}
-		}
-	},
-
-	_updateStyle: function (layer) {
-		this.__updateStyle.call(this, layer);
-
-		var context = layer ? layer : this;
-		
-		if (context.options.stroke) {
-			if (context.options.lineCap) {
-				context._path.setAttribute('stroke-linecap', context.options.lineCap);
+				context._path.removeAttribute('filter');
 			}
 
-			if (context.options.lineJoin) {
-				context._path.setAttribute('stroke-linejoin', context.options.lineJoin);
+			if (context.options.fillPattern) {
+				context._createFillPattern(context.options.fillPattern);
 			}
+
+			context._applyCustomStyles();
+
 		}
 
-		if (context.options.gradient) {
-			context._createGradient(context.options.gradient);
-
-			context._path.setAttribute('fill', 'url(#' + context._gradient.getAttribute('id') + ')');
-		}
-		else if (!context.options.fill) {
-			context._path.setAttribute('fill', 'none');
-		}
-
-		if (context.options.dropShadow) {
-			context._createDropShadow();
-
-			context._path.setAttribute('filter', 'url(#' + context._dropShadow.getAttribute('id') + ')');
-		}
-		else {
-			context._path.removeAttribute('filter');
-		}
-
-		if (context.options.fillPattern) {
-			context._createFillPattern(context.options.fillPattern);
-		}
-		
-		context._applyCustomStyles();
-
-	}
-
-};
+	};
 
 if (L.SVG) {
 	// Potential fix for working with 0.8
@@ -3001,23 +3016,23 @@ LineTextFunctions.__updatePath = L.Polyline.prototype._updatePath;
 // Pulled from the Leaflet discussion here:  https://github.com/Leaflet/Leaflet/pull/1586
 // This is useful for getting a centroid/anchor point for centering text or other SVG markup
 LineTextFunctions.getCenter = function () {
-		var latlngs = this._latlngs,
-				len = latlngs.length,
-				i, j, p1, p2, f, center;
+	var latlngs = this._latlngs,
+		len = latlngs.length,
+		i, j, p1, p2, f, center;
 
-		for (i = 0, j = len - 1, area = 0, lat = 0, lng = 0; i < len; j = i++) {
-				p1 = latlngs[i];
-				p2 = latlngs[j];
-				f = p1.lat * p2.lng - p2.lat * p1.lng;
-				lat += (p1.lat + p2.lat) * f;
-				lng += (p1.lng + p2.lng) * f;
-				area += f / 2;
-		}
+	for (i = 0, j = len - 1, area = 0, lat = 0, lng = 0; i < len; j = i++) {
+		p1 = latlngs[i];
+		p2 = latlngs[j];
+		f = p1.lat * p2.lng - p2.lat * p1.lng;
+		lat += (p1.lat + p2.lat) * f;
+		lng += (p1.lng + p2.lng) * f;
+		area += f / 2;
+	}
 
-		center = area ? new L.LatLng(lat / (6 * area), lng / (6 * area)) : latlngs[0];
-		center.area = area;
+	center = area ? new L.LatLng(lat / (6 * area), lng / (6 * area)) : latlngs[0];
+	center.area = area;
 
-		return center;
+	return center;
 };
 
 // Sets the text anchor to the centroid of a line/polygon
@@ -3042,14 +3057,14 @@ L.CircleMarker = L.CircleMarker.extend({
 			this._createShapeImage(this.options.shapeImage);
 		}
 	},
-	
+
 	getTextAnchor: function () {
 		var point = null;
-		
+
 		if (this._point) {
 			point = new L.Point(this._point.x, this._point.y);
 		}
-		
+
 		return point;
 	}
 });
@@ -3130,22 +3145,22 @@ L.MapMarker = L.Path.extend({
 		this.options.radius = radius;
 		return this.redraw();
 	},
-	
+
 	setInnerRadius: function (innerRadius) {
 		this.options.innerRadius = innerRadius;
 		return this.redraw();
 	},
-	
+
 	setRotation: function (rotation) {
 		this.options.rotation = rotation;
 		return this.redraw();
 	},
-	
+
 	setNumberOfSides: function (numberOfSides) {
 		this.options.numberOfSides = numberOfSides;
 		return this.redraw();
 	},
-	
+
 	getPathString: function () {
 		var anchorPoint = this.getTextAnchor();
 
@@ -3168,11 +3183,11 @@ L.MapMarker = L.Path.extend({
 
 	getTextAnchor: function () {
 		var point = null;
-		
+
 		if (this._point) {
 			point = new L.Point(this._point.x, this._point.y - 2 * this.options.radius);
 		}
-		
+
 		return point;
 	},
 
@@ -3234,7 +3249,7 @@ L.MapMarker = L.Path.extend({
 			this._createShapeImage(this.options.shapeImage);
 		}
 	},
-	
+
 	toGeoJSON: function () {
 		return L.Util.pointToGeoJSON.call(this);
 	}
@@ -3307,36 +3322,36 @@ L.RegularPolygonMarker = L.Path.extend({
 		this.options.radius = radius;
 		return this.redraw();
 	},
-	
+
 	setRadiusXY: function (radiusX, radiusY) {
 		this.options.radius = null;
 		this.options.radiusX = radiusX;
 		this.options.radiusY = radiusY;
 		return this.redraw();
 	},
-	
+
 	setInnerRadius: function (innerRadius) {
 		this.options.innerRadius = innerRadius;
 		return this.redraw();
 	},
-	
+
 	setInnerRadiusXY: function (innerRadiusX, innerRadiusY) {
 		this.options.innerRadius = null;
 		this.options.innerRadiusX = innerRadiusX;
 		this.options.innerRadiusY = innerRadiusY;
 		return this.redraw();
 	},
-	
+
 	setRotation: function (rotation) {
 		this.options.rotation = rotation;
 		return this.redraw();
 	},
-	
+
 	setNumberOfSides: function (numberOfSides) {
 		this.options.numberOfSides = numberOfSides;
 		return this.redraw();
 	},
-	
+
 	getLatLng: function () {
 		return this._latlng;
 	},
@@ -3416,7 +3431,7 @@ L.RegularPolygonMarker = L.Path.extend({
 			this._createShapeImage(this.options.shapeImage);
 		}
 	},
-	
+
 	toGeoJSON: function () {
 		return L.Util.pointToGeoJSON.call(this);
 	}
@@ -3440,7 +3455,7 @@ L.StarMarker = L.RegularPolygonMarker.extend({
 		this.options.numberOfPoints = numberOfPoints;
 		return this.redraw();
 	},
-	
+
 	_getPoints: function (inner) {
 		var maxDegrees = this.options.maxDegrees || 360;
 		var angleSize = maxDegrees / this.options.numberOfPoints;
@@ -3573,16 +3588,16 @@ L.SVGMarker = L.Path.extend({
 	projectLatlngs: function () {
 		this._point = this._map.latLngToLayerPoint(this._latlng);
 	},
-	
+
 	setLatLng: function (latlng) {
 		this._latlng = latlng;
 		this.redraw();
 	},
-	
+
 	getLatLng: function () {
 		return this._latlng;
 	},
-	
+
 	getPathString: function () {
 		var me = this;
 
@@ -3658,7 +3673,7 @@ L.SVGMarker = L.Path.extend({
 			addSVG();
 		}
 	},
-	
+
 	toGeoJSON: function () {
 		return pointToGeoJSON.call(this);
 	}
@@ -3674,11 +3689,11 @@ L.MarkerGroup = L.FeatureGroup.extend({
 
 		this.setLatLng(latlng);
 	},
-	
+
 	setStyle: function (style) {
 		return this;
 	},
-	
+
 	setLatLng: function (latlng) {
 		this._latlng = latlng;
 		this.eachLayer(function (layer) {
@@ -3686,32 +3701,33 @@ L.MarkerGroup = L.FeatureGroup.extend({
 				layer.setLatLng(latlng);
 			}
 		});
-		
+
 		return this;
 	},
-	
+
 	getLatLng: function (latlng) {
 		return this._latlng;
 	},
-	
+
 	toGeoJSON: function () {
 		var featureCollection = {
 			type: 'FeatureCollection',
 			features: []
 		};
-		
+
 		var eachLayerFunction = function (featureCollection) {
 			return function (layer) {
 				featureCollection.features.push(L.Util.pointToGeoJSON.call(layer));
 			};
 		};
-		
+
 		this.eachLayer(eachLayerFunction(featureCollection));
-		
+
 		return featureCollection;
 	}
 });
-;/*
+;
+/*
  * Class for a drawing a bar marker on the map.  This is the basis for the BarChartMarker
  */
 L.BarMarker = L.Path.extend({
@@ -3777,14 +3793,14 @@ L.BarMarker = L.Path.extend({
 		var halfWidth = this.options.width / 2;
 		var sePoint, nePoint, nwPoint, swPoint;
 		var height = this.options.value / this.options.maxValue * this.options.maxHeight;
-		
+
 		sePoint = new L.Point(startX + halfWidth, startY);
 		nePoint = new L.Point(startX + halfWidth, startY - height);
 		nwPoint = new L.Point(startX - halfWidth, startY - height);
 		swPoint = new L.Point(startX - halfWidth, startY);
-		
+
 		points = [sePoint, nePoint, nwPoint, swPoint];
-		
+
 		return points;
 	}
 
@@ -3803,10 +3819,10 @@ L.ChartMarker = L.FeatureGroup.extend({
 
 		this._layers = {};
 		this._latlng = centerLatLng;
-		
+
 		this._loadComponents();
 	},
-	
+
 	setLatLng: function (latlng) {
 		this._latlng = latlng;
 		return this.redraw();
@@ -3819,27 +3835,27 @@ L.ChartMarker = L.FeatureGroup.extend({
 	_loadComponents: function () {
 		// TODO: Override this in subclasses
 	},
-	
+
 	_highlight: function (options) {
 		if (options.weight) {
 			options.weight *= 2;
 		}
-		
+
 		return options;
 	},
-	
+
 	_unhighlight: function (options) {
 		if (options.weight) {
 			options.weight /= 2;
 		}
-		
+
 		return options;
 	},
-	
+
 	_bindMouseEvents: function (chartElement) {
 		var self = this;
 		var tooltipOptions = this.options.tooltipOptions;
-	
+
 		chartElement.on('mouseover', function (e) {
 			var currentOptions = this.options;
 			var key = currentOptions.key;
@@ -3848,62 +3864,62 @@ L.ChartMarker = L.FeatureGroup.extend({
 			var x = layerPoint.x - this._point.x;
 			var y = layerPoint.y - this._point.y;
 			var iconSize = currentOptions.iconSize;
-			var newX = x; 
+			var newX = x;
 			var newY = y;
 			var newPoint;
 			var offset = 5;
-			
+
 			newX = x < 0 ? iconSize.x - x + offset: -x - offset;
 			newY = y < 0 ? iconSize.y - y + offset: -y - offset;
-			
+
 			newPoint = new L.Point(newX, newY);
-			
+
 			var legendOptions = {};
 			var displayText = currentOptions.displayText ? currentOptions.displayText(value) : value;
-			
+
 			legendOptions[key] = {
 				name: currentOptions.displayName,
 				value: displayText
 			};
-			
+
 			var icon = new L.LegendIcon(legendOptions, currentOptions, {
 				className: 'leaflet-div-icon',
 				iconSize: tooltipOptions ? tooltipOptions.iconSize : iconSize,
 				iconAnchor: newPoint
 			});
-			
+
 			currentOptions.marker = new L.Marker(self._latlng, {
 				icon: icon
 			});
-			
+
 			currentOptions = self._highlight(currentOptions);
-			
+
 			this.initialize(self._latlng, currentOptions);
 			this.redraw();
 			this.setStyle(currentOptions);
-			
+
 			self.addLayer(currentOptions.marker);
 		});
-		
+
 		chartElement.on('mouseout', function (e) {
 			var currentOptions = this.options;
-			
+
 			currentOptions = self._unhighlight(currentOptions);
-			
+
 			this.initialize(self._latlng, currentOptions);
 			this.redraw();
 			this.setStyle(currentOptions);
-			
+
 			self.removeLayer(currentOptions.marker);
 		});
 	},
-	
+
 	bindPopup: function (content, options) {
 		this.eachLayer(function (layer) {
 			layer.bindPopup(content, options);
 		});
 	},
-	
+
 	openPopup: function (latlng) {
 		for (var i in this._layers) {
 			var layer = this._layers[i];
@@ -3912,7 +3928,7 @@ L.ChartMarker = L.FeatureGroup.extend({
 			break;
 		}
 	},
-	
+
 	closePopup: function () {
 		for (var i in this._layers) {
 			var layer = this._layers[i];
@@ -3921,12 +3937,12 @@ L.ChartMarker = L.FeatureGroup.extend({
 			break;
 		}
 	},
-	
+
 	redraw: function () {
 		this.clearLayers();
 		this._loadComponents();
 	},
-	
+
 	toGeoJSON: function () {
 		return L.Util.pointToGeoJSON.call(this);
 	}
@@ -3969,10 +3985,10 @@ L.BarChartMarker = L.ChartMarker.extend({
 		var data = this.options.data;
 		var chartOptions = this.options.chartOptions;
 		var chartOption;
-		
+
 		x = -((width * count) + (offset * (count - 1))) / 2 + width / 2;
 		y = 0;
-		
+
 		// Iterate through the data values
 		for (var key in data) {
 			value = data[key];
@@ -3980,7 +3996,7 @@ L.BarChartMarker = L.ChartMarker.extend({
 
 			minValue = chartOption.minValue || 0;
 			maxValue = chartOption.maxValue || 100;
-			
+
 			options.fillColor = chartOption.fillColor || this.options.fillColor;
 			options.value = value;
 			options.minValue = minValue;
@@ -3999,13 +4015,13 @@ L.BarChartMarker = L.ChartMarker.extend({
 			options.weight = this.options.weight || 1;
 			options.color = chartOption.color || this.options.color;
 			options.displayText = chartOption.displayText;
-			
+
 			bar = new L.BarMarker(this._latlng, options);
-			
+
 			this._bindMouseEvents(bar);
-			
+
 			this.addLayer(bar);
-			
+
 			x += width + offset;
 		}
 	}
@@ -4019,9 +4035,9 @@ L.RadialBarMarker = L.Path.extend({
 	initialize: function (centerLatLng, options) {
 		L.Path.prototype.initialize.call(this, options);
 
-		this._latlng = centerLatLng;	
+		this._latlng = centerLatLng;
 	},
-	
+
 	options: {
 		fill: true,
 		radius: 10,
@@ -4041,7 +4057,7 @@ L.RadialBarMarker = L.Path.extend({
 	},
 
 	projectLatlngs: function () {
-		this._point = this._map.latLngToLayerPoint(this._latlng);	
+		this._point = this._map.latLngToLayerPoint(this._latlng);
 		this._points = this._getPoints();
 	},
 
@@ -4056,21 +4072,21 @@ L.RadialBarMarker = L.Path.extend({
 			nePoint = new L.Point(point.x + deltaX, point.y - deltaY),
 			sw = map.unproject(swPoint),
 			ne = map.unproject(nePoint);
-	
+
 		return new L.LatLngBounds(sw, ne);
 	},
 
 	getLatLng: function () {
 		return this._latlng;
 	},
-	
+
 	getPathString: function () {
-	
+
 		var angle = this.options.endAngle - this.options.startAngle;
 		var largeArc = angle >= 180 ? '1' : '0';
 		var radiusX = this.options.radiusX || this.options.radius;
 		var radiusY = this.options.radiusY || this.options.radius;
-		var path = 'M' + this._points[0].x.toFixed(2) + ',' + this._points[0].y.toFixed(2) + 'A' + radiusX.toFixed(2) + ',' + radiusY.toFixed(2) + ' 0 ' + largeArc + ',1 ' + this._points[1].x.toFixed(2) + ',' + this._points[1].y.toFixed(2) + 'L'; 
+		var path = 'M' + this._points[0].x.toFixed(2) + ',' + this._points[0].y.toFixed(2) + 'A' + radiusX.toFixed(2) + ',' + radiusY.toFixed(2) + ' 0 ' + largeArc + ',1 ' + this._points[1].x.toFixed(2) + ',' + this._points[1].y.toFixed(2) + 'L';
 
 		if (this._innerPoints) {
 			path = path + this._innerPoints[0].x.toFixed(2) + ',' + this._innerPoints[0].y.toFixed(2);
@@ -4079,13 +4095,13 @@ L.RadialBarMarker = L.Path.extend({
 		else {
 			path = path + this._point.x.toFixed(2) + ',' + this._point.y.toFixed(2) + 'z';
 		}
-		
+
 		if (L.Browser.vml) {
 			path = Core.SVG.path(path);
 		}
-		
+
 		this._path.setAttribute('shape-rendering', 'geometricPrecision');
-		
+
 		return path;
 
 	},
@@ -4096,7 +4112,7 @@ L.RadialBarMarker = L.Path.extend({
 		var degrees = this.options.endAngle + this.options.rotation;
 		var angle = this.options.startAngle + this.options.rotation;
 		var points = [];
-		var radiusX = 'radiusX' in this.options ? this.options.radiusX : this.options.radius; 
+		var radiusX = 'radiusX' in this.options ? this.options.radiusX : this.options.radius;
 		var radiusY = 'radiusY' in this.options ? this.options.radiusY : this.options.radius;
 		var toRad = function (number) {
 			return number * L.LatLng.DEG_TO_RAD;
@@ -4104,26 +4120,26 @@ L.RadialBarMarker = L.Path.extend({
 
 		// Make sure degrees is defined
 		degrees = degrees || 0;
-		
+
 		if (angleDelta === 360.0) {
 			degrees = degrees - 0.1;
 		}
-		
+
 		var startRadians = toRad(angle);
 		var endRadians = toRad(degrees);
-		
+
 		points.push(this._getPoint(startRadians, radiusX, radiusY));
 		points.push(this._getPoint(endRadians, radiusX, radiusY));
-		
+
 		if (this.options.barThickness) {
 			this._innerPoints = [];
 			this._innerPoints.push(this._getPoint(endRadians, radiusX - this.options.barThickness, radiusY - this.options.barThickness));
 			this._innerPoints.push(this._getPoint(startRadians, radiusX - this.options.barThickness, radiusY - this.options.barThickness));
 		}
-		
+
 		return points;
 	},
-	
+
 	_getPoint: function (angle, radiusX, radiusY) {
 		return new L.Point(this._point.x + this.options.position.x + radiusX * Math.cos(angle), this._point.y + this.options.position.y + radiusY * Math.sin(angle));
 	}
@@ -4139,7 +4155,7 @@ L.radialBarMarker = function (centerLatLng, options) {
 L.PieChartMarker = L.ChartMarker.extend({
 	initialize: function (centerLatLng, options) {
 		L.Util.setOptions(this, options);
-		
+
 		L.ChartMarker.prototype.initialize.call(this, centerLatLng, options);
 	},
 
@@ -4158,7 +4174,7 @@ L.PieChartMarker = L.ChartMarker.extend({
 
 	_highlight: function (options) {
 		var oldRadiusX = options.radiusX;
-        var oldRadiusY = options.radiusY;
+		var oldRadiusY = options.radiusY;
 		var oldBarThickness = options.barThickness;
 		options.oldBarThickness = oldBarThickness;
 		options.oldRadiusX = oldRadiusX;
@@ -4168,14 +4184,14 @@ L.PieChartMarker = L.ChartMarker.extend({
 		options.barThickness = options.radiusX - oldRadiusX + oldBarThickness;
 		return options;
 	},
-	
+
 	_unhighlight: function (options) {
 		options.radiusX = options.oldRadiusX;
 		options.radiusY = options.oldRadiusY;
 		options.barThickness = options.oldBarThickness;
 		return options;
 	},
-	
+
 	_loadComponents: function () {
 		var value;
 		var sum = 0;
@@ -4189,7 +4205,7 @@ L.PieChartMarker = L.ChartMarker.extend({
 		var chartOptions = this.options.chartOptions;
 		var chartOption;
 		var key;
-		
+
 		var getValue = function (data, key) {
 			var value = 0.0;
 			if (data[key]) {
@@ -4197,25 +4213,25 @@ L.PieChartMarker = L.ChartMarker.extend({
 			}
 			return value;
 		};
-		
+
 		// Calculate the sum of the data values
 		for (key in data) {
 			value = getValue(data, key);
 			sum += value;
 		}
-		
+
 		// Iterate through the data values
 		if (sum > 0) {
-			for (key in data) {		
+			for (key in data) {
 				value = parseFloat(data[key]) || 0;
 				chartOption = chartOptions[key];
 				percentage = value / sum;
-			
+
 				angle = percentage * maxDegrees;
-			
+
 				options.startAngle = lastAngle;
 				options.endAngle = lastAngle + angle;
-				
+
 				options.fillColor = chartOption.fillColor;
 				options.color = chartOption.color || '#000';
 				options.radiusX = this.options.radiusX || this.options.radius;
@@ -4227,13 +4243,13 @@ L.PieChartMarker = L.ChartMarker.extend({
 				options.value = value;
 				options.displayName = chartOption.displayName;
 				options.displayText = chartOption.displayText;
-			
+
 				bar = new L.RadialBarMarker(this._latlng, options);
-			
+
 				this._bindMouseEvents(bar);
-			
+
 				lastAngle = options.endAngle;
-			
+
 				this.addLayer(bar);
 			}
 		}
@@ -4289,25 +4305,25 @@ L.CoxcombChartMarker = L.CoxcombChartMarker.extend({
 		var data = this.options.data;
 		var chartOptions = this.options.chartOptions;
 		var chartOption;
-		
+
 		angle = maxDegrees / count;
-		
+
 		var postProcess = function (value) {
 			return Math.sqrt(count * value / Math.PI);
 		};
-		
+
 		// Iterate through the data values
 		for (var key in data) {
 			value = parseFloat(data[key]) || 0;
 			chartOption = chartOptions[key];
-			
+
 			minValue = chartOption.minValue || 0;
 			maxValue = chartOption.maxValue;
-			
+
 			// If the size mode is radius, then we'll just vary the radius proportionally to the value
 			if (this.options.sizeMode === L.CoxcombChartMarker.SIZE_MODE_RADIUS) {
 				var evalFunctionX = new L.LinearFunction(new L.Point(minValue, 0), new L.Point(maxValue, radiusX));
-				var evalFunctionY = new L.LinearFunction(new L.Point(minValue, 0), new L.Point(maxValue, radiusY)); 
+				var evalFunctionY = new L.LinearFunction(new L.Point(minValue, 0), new L.Point(maxValue, radiusY));
 				options.radiusX = evalFunctionX.evaluate(value);
 				options.radiusY = evalFunctionY.evaluate(value);
 			}
@@ -4315,33 +4331,33 @@ L.CoxcombChartMarker = L.CoxcombChartMarker.extend({
 				// Otherwise, we'll vary the area proportionally to the value and calculate the radius from the area value
 				var radius = Math.max(radiusX, radiusY);
 				var maxArea = (Math.PI * Math.pow(radius, 2)) / count;
-				
+
 				var evalFunctionArea = new L.LinearFunction(new L.Point(minValue, 0), new L.Point(maxValue, maxArea), {
 					postProcess: postProcess
 				});
-				
+
 				options.radiusX = evalFunctionArea.evaluate(value);
 				options.radiusY = options.radiusX;
 			}
-			
+
 			options.startAngle = lastAngle;
 			options.endAngle = lastAngle + angle;
 			options.fillColor = chartOption.fillColor;
 			options.color = chartOption.color || '#000';
 			options.rotation = 0;
-			
+
 			// Set the key and value for use later
 			options.key = key;
 			options.value = value;
 			options.displayName = chartOption.displayName;
 			options.displayText = chartOption.displayText;
-			
+
 			bar = new L.RadialBarMarker(this._latlng, options);
-			
+
 			this._bindMouseEvents(bar);
-			
+
 			lastAngle = options.endAngle;
-			
+
 			this.addLayer(bar);
 		}
 	}
@@ -4357,7 +4373,7 @@ L.coxcombChartMarker = function (centerLatLng, options) {
 L.RadialBarChartMarker = L.ChartMarker.extend({
 	initialize: function (centerLatLng, options) {
 		L.Util.setOptions(this, options);
-		
+
 		L.ChartMarker.prototype.initialize.call(this, centerLatLng, options);
 	},
 
@@ -4388,19 +4404,19 @@ L.RadialBarChartMarker = L.ChartMarker.extend({
 		var chartOption;
 		var barThickness = this.options.barThickness || 4;
 		var offset = this.options.offset || 2;
-		
+
 		// Iterate through the data values
 		for (var key in data) {
 			value = parseFloat(data[key]);
 			chartOption = chartOptions[key];
-			
+
 			minValue = chartOption.minValue || 0;
 			maxValue = chartOption.maxValue || 100;
-			
+
 			var angleFunction = new L.LinearFunction(new L.Point(minValue, 0), new L.Point(maxValue, maxDegrees));
-			
+
 			angle = angleFunction.evaluate(value);
-			
+
 			options.startAngle = this.options.rotation;
 			options.endAngle = this.options.rotation + angle;
 			options.fillColor = chartOption.fillColor;
@@ -4413,16 +4429,16 @@ L.RadialBarChartMarker = L.ChartMarker.extend({
 			options.displayName = chartOption.displayName;
 			options.displayText = chartOption.displayText;
 			options.weight = this.options.weight || 1;
-			
+
 			bar = new L.RadialBarMarker(this._latlng, options);
-			
+
 			this._bindMouseEvents(bar);
-			
+
 			this.addLayer(bar);
-			
+
 			lastRadiusX += barThickness + offset;
 			lastRadiusY += barThickness + offset;
-			
+
 		}
 	}
 });
@@ -4435,13 +4451,13 @@ L.StackedRegularPolygonMarker = L.ChartMarker.extend({
 	options: {
 		iconSize: new L.Point(50, 40)
 	},
-	
+
 	initialize: function (centerLatLng, options) {
 		L.Util.setOptions(this, options);
-		
+
 		L.ChartMarker.prototype.initialize.call(this, centerLatLng, options);
 	},
-	
+
 	_loadComponents: function () {
 		var value;
 		var lastRadiusX = 0;
@@ -4452,35 +4468,35 @@ L.StackedRegularPolygonMarker = L.ChartMarker.extend({
 		var chartOptions = this.options.chartOptions;
 		var chartOption;
 		var key;
-		
+
 		// Iterate through the data values
 		var bars = [];
-		
-		for (key in data) {		
+
+		for (key in data) {
 			value = parseFloat(data[key]);
 			chartOption = chartOptions[key];
-			
+
 			minValue = chartOption.minValue || 0;
 			maxValue = chartOption.maxValue || 100;
-			
+
 			// TODO:  Add support for x and y radii
 			minRadius = chartOption.minRadius || 0;
 			maxRadius = chartOption.maxRadius || 10;
-			
+
 			options.fillColor = chartOption.fillColor || this.options.fillColor;
 			options.value = value;
 			options.minValue = minValue;
 			options.maxValue = maxValue;
-			
+
 			var evalFunction = new L.LinearFunction(new L.Point(minValue, minRadius), new L.Point(maxValue, maxRadius));
-			
+
 			var barThickness = evalFunction.evaluate(value);
-			
+
 			options.radiusX = lastRadiusX + barThickness;
 			options.radiusY = lastRadiusY + barThickness;
 			options.innerRadiusX = lastRadiusX;
 			options.innerRadiusY = lastRadiusY;
-			
+
 			options.key = key;
 			options.displayName = chartOption.displayName;
 			options.opacity = this.options.opacity || 1.0;
@@ -4488,14 +4504,14 @@ L.StackedRegularPolygonMarker = L.ChartMarker.extend({
 			options.weight = this.options.weight || 1;
 			options.color = chartOption.color || this.options.color;
 			options.displayText = chartOption.displayText;
-			
+
 			bar = new L.RegularPolygonMarker(this._latlng, options);
-			
+
 			this._bindMouseEvents(bar);
-			
+
 			lastRadiusX = options.radiusX;
 			lastRadiusY = options.radiusY;
-			
+
 			if (this.options.drawReverse) {
 				bars.push(bar);
 			}
@@ -4503,16 +4519,16 @@ L.StackedRegularPolygonMarker = L.ChartMarker.extend({
 				this.addLayer(bar);
 			}
 		}
-		
+
 		if (this.options.drawReverse) {
 			var item = bars.pop();
-		
+
 			while (item) {
 				this.addLayer(item);
 				item = bars.pop();
 			}
 		}
-		
+
 	}
 });
 
@@ -4522,7 +4538,7 @@ L.StackedRegularPolygonMarker = L.ChartMarker.extend({
 L.RadialMeterMarker = L.ChartMarker.extend({
 	initialize: function (centerLatLng, options) {
 		L.Util.setOptions(this, options);
-		
+
 		L.ChartMarker.prototype.initialize.call(this, centerLatLng, options);
 	},
 
@@ -4563,31 +4579,31 @@ L.RadialMeterMarker = L.ChartMarker.extend({
 		var numSegments = this.options.numSegments || 10;
 		var angleDelta = maxDegrees / numSegments;
 		var displayOptions;
-		
+
 		// Iterate through the data values
 		for (var key in data) {
 			value = parseFloat(data[key]);
 			chartOption = chartOptions[key];
 			displayOptions = this.options.displayOptions ? this.options.displayOptions[key] : {};
-			
+
 			minValue = chartOption.minValue || 0;
 			maxValue = chartOption.maxValue || 100;
-			
+
 			var range = maxValue - minValue;
 
 			var angle = (maxDegrees / range) * (value - minValue);
-			
+
 			var endAngle = startAngle + angle;
 			var maxAngle = startAngle + maxDegrees;
-			
+
 			var evalFunction = new L.LinearFunction(new L.Point(startAngle, minValue), new L.Point(maxAngle, maxValue));
 			var delta, evalValue;
-			
+
 			while (lastAngle < endAngle) {
 				options.startAngle = lastAngle;
-				
+
 				delta = Math.min(angleDelta, endAngle - lastAngle);
-				
+
 				options.endAngle = lastAngle + delta;
 				options.fillColor = chartOption.fillColor;
 				options.radiusX = radiusX;
@@ -4598,27 +4614,27 @@ L.RadialMeterMarker = L.ChartMarker.extend({
 				options.value = value;
 				options.displayName = chartOption.displayName;
 				options.displayText = chartOption.displayText;
-				
+
 				evalValue = evalFunction.evaluate(lastAngle + delta);
-				
+
 				for (var displayKey in displayOptions) {
 					options[displayKey] = displayOptions[displayKey].evaluate ? displayOptions[displayKey].evaluate(evalValue) : displayOptions[displayKey];
 				}
-				
+
 				bar = new L.RadialBarMarker(this._latlng, options);
-				
+
 				this._bindMouseEvents(bar);
-				
+
 				this.addLayer(bar);
-				
+
 				lastAngle += delta;
 			}
-			
+
 			// Add a background
 			if (this.options.backgroundStyle) {
 				if (lastAngle < maxAngle) {
 					delta = maxAngle - lastAngle;
-				
+
 					options.endAngle = lastAngle + delta;
 					options.radiusX = radiusX;
 					options.radiusY = radiusY;
@@ -4628,17 +4644,17 @@ L.RadialMeterMarker = L.ChartMarker.extend({
 					options.value = value;
 					options.displayName = chartOption.displayName;
 					options.displayText = chartOption.displayText;
-					
+
 					options.fillColor = null;
 					options.fill = false;
 					options.gradient = false;
-					
+
 					for (var property in this.options.backgroundStyle) {
 						options[property] = this.options.backgroundStyle[property];
 					}
-					
+
 					evalValue = evalFunction.evaluate(lastAngle + delta);
-				
+
 					bar = new L.RadialBarMarker(this._latlng, options);
 
 					this.addLayer(bar);
@@ -4646,7 +4662,9 @@ L.RadialMeterMarker = L.ChartMarker.extend({
 			}
 		}
 	}
-});;/*
+});
+;
+/*
  * Various modes in which location information can be encoded
  */
 L.LocationModes = {
@@ -4933,7 +4951,7 @@ L.DataLayer = L.LayerGroup.extend({
 			return layerStyle;
 		}
 	},
-	
+
 	initialize: function (data, options) {
 		L.Util.setOptions(this, options);
 
@@ -4945,18 +4963,18 @@ L.DataLayer = L.LayerGroup.extend({
 		this._markerFunction = this.options.getMarker || this._getMarker;
 
 		this._addChildLayers();
-		
+
 		this.addData(data);
 	},
 
 	_addChildLayers: function () {
 		this._boundaryLayer = new L.LayerGroup();
 		this.addLayer(this._boundaryLayer);
-		
+
 		this._trackLayer = new L.LayerGroup();
 		this.addLayer(this._trackLayer);
 	},
-	
+
 	_zoomFunction: function (e) {
 		var map = this._map;
 		var self = this;
@@ -4997,31 +5015,31 @@ L.DataLayer = L.LayerGroup.extend({
 
 		map.off('zoomend', this._zoomFunction, this);
 	},
-	
-	bringToBack: function () {		
+
+	bringToBack: function () {
 		this.invoke('bringToBack');
-		
+
 		if (this._trackLayer) {
 			this._trackLayer.invoke('bringToBack');
 		}
-		
+
 		if (this._boundaryLayer) {
 			this._boundaryLayer.invoke('bringToBack');
 		}
 	},
-	
+
 	bringToFront: function () {
 		if (this._boundaryLayer) {
 			this._boundaryLayer.invoke('bringToFront');
 		}
-		
+
 		if (this._trackLayer) {
 			this._trackLayer.invoke('bringToFront');
 		}
-		
+
 		this.invoke('bringToFront');
 	},
-	
+
 	getBounds: function () {
 		var bounds;
 
@@ -5052,26 +5070,26 @@ L.DataLayer = L.LayerGroup.extend({
 	_styleBoundary: function (layer, options, record) {
 		if (layer.setStyle) {
 			var style;
-			
+
 			if (this.options.boundaryStyle instanceof Function) {
 				style = this.options.boundaryStyle.call(this, record, layer);
 			}
-			
+
 			style = style || this.options.boundaryStyle || L.extend({}, options, {
-				fillOpacity: 0.2,
-				clickable: false
-			});
+					fillOpacity: 0.2,
+					clickable: false
+				});
 
 			layer.setStyle(style);
 		}
-		
+
 		return layer;
 	},
-	
+
 	_addBoundary: function (location, options, record) {
 		var layer = location.location;
 		var boundaryLayer;
-		
+
 		if (this.options.includeBoundary) {
 			if (layer instanceof L.LatLngBounds) {
 				layer = new L.Rectangle(layer);
@@ -5080,10 +5098,10 @@ L.DataLayer = L.LayerGroup.extend({
 			layer = this._styleBoundary(layer, options, record);
 
 			this._boundaryLayer.addLayer(layer);
-			
+
 			boundaryLayer = layer;
 		}
-		
+
 		return boundaryLayer;
 	},
 
@@ -5093,12 +5111,12 @@ L.DataLayer = L.LayerGroup.extend({
 		location = this._processLocation(location);
 
 		var markerLayer;
-		
+
 		if (location) {
 			markerLayer = this._markerFunction.call(this, location, options, record);
 			markerLayer.boundaryLayer = boundaryLayer;
 		}
-		
+
 		return markerLayer;
 	},
 
@@ -5129,7 +5147,7 @@ L.DataLayer = L.LayerGroup.extend({
 
 	_loadRecords: function (records) {
 		var location;
-		
+
 		records = this._preProcessRecords(records);
 
 		for (var recordIndex in records) {
@@ -5137,7 +5155,7 @@ L.DataLayer = L.LayerGroup.extend({
 				var record = records[recordIndex];
 
 				record = this.options.deriveProperties ? this.options.deriveProperties(record) : record;
-				
+
 				var includeLayer = this._shouldLoadRecord(record);
 
 				if (includeLayer) {
@@ -5217,7 +5235,7 @@ L.DataLayer = L.LayerGroup.extend({
 	reloadData: function () {
 		if (!this._layerIndex) {
 			this.clearLayers();
-			
+
 			this._addChildLayers();
 		}
 
@@ -5237,7 +5255,7 @@ L.DataLayer = L.LayerGroup.extend({
 			this._layerIndex = {};
 			this._boundaryIndex = {};
 		}
-		
+
 		if (this.options.locationMode === L.LocationModes.CUSTOM && this.options.preload) {
 			this._preloadLocations(records);
 		}
@@ -5337,7 +5355,7 @@ L.DataLayer = L.LayerGroup.extend({
 			layer.off('mouseover');
 			layer.off('mouseout');
 			layer.off('mousemove');
-			
+
 			layer.on({
 				mouseover: highlight,
 				mouseout: unhighlight,
@@ -5401,30 +5419,30 @@ L.DataLayer = L.LayerGroup.extend({
 	_getIndexedLayer: function (index, location, layerOptions, record) {
 		if (this.options.getIndexKey) {
 			var indexKey = this.options.getIndexKey.call(this, location, record);
-			
+
 			if (indexKey in index) {
 				// This is an old layer, so let's restyle it
 				layer = index[indexKey];
-				
+
 				var updateFunction = function (layer) {
 					if (layerOptions.radius && layer instanceof L.CircleMarker) {
 						layer.setRadius(layerOptions.radius);
 					}
-					
+
 					layer.setStyle(layerOptions);
-					
+
 					if (layer.setLatLng && layer.getLatLng() !== location.center) {
-						
+
 						layer.setLatLng(location.center);
-						
+
 					}
 					else {
 						layer.redraw();
 					}
 				};
-				
+
 				L.Util.updateLayer(layer, updateFunction);
-				
+
 				if (layer.boundaryLayer) {
 					layer.boundaryLayer = this._styleBoundary(layer.boundaryLayer, layerOptions, record);
 				}
@@ -5434,12 +5452,12 @@ L.DataLayer = L.LayerGroup.extend({
 				layer = this._getLayer(location, layerOptions, record);
 				index[indexKey] = layer;
 			}
-			
+
 			if (this.options.getTrack) {
 				var shouldAdd = !layer.trackLayer;
-				
+
 				layer.trackLayer = this.options.getTrack.call(this, layer, location, layer.trackLayer);
-				
+
 				if (shouldAdd) {
 					this._trackLayer.addLayer(layer.trackLayer);
 				}
@@ -5448,23 +5466,23 @@ L.DataLayer = L.LayerGroup.extend({
 		else {
 			layer = this._getLayer(location, layerOptions, record);
 		}
-		
+
 		return layer;
 	},
-	
+
 	recordToLayer: function (location, record) {
 		var layerOptions = L.Util.extend({},this.options.layerOptions);
 		var layer;
 		var legendDetails = {};
 		var includeLayer = true;
 		var me = this;
-		
+
 		if (this._includeFunction) {
 			includeLayer = this._includeFunction.call(this, record);
 		}
 
 		if (includeLayer) {
-			
+
 			var dynamicOptions = this._getDynamicOptions(record);
 
 			layerOptions = dynamicOptions.layerOptions;
@@ -5475,7 +5493,7 @@ L.DataLayer = L.LayerGroup.extend({
 
 				// If layer indexing is being used, then load the existing layer from the index
 				layer = this._getIndexedLayer(this._layerIndex, location, layerOptions, record);
-				
+
 				if (layer) {
 					if (this.options.showLegendTooltips) {
 						this._bindMouseEvents(layer, layerOptions, legendDetails);
@@ -5517,7 +5535,7 @@ L.DataLayer = L.LayerGroup.extend({
 				return params.breaks[value];
 			}
 		};
-		
+
 		for (var property in displayProperties) {
 
 			if (displayProperties.hasOwnProperty(property) && ignoreProperties.indexOf(property) === -1) {
@@ -5557,9 +5575,9 @@ L.DataLayer = L.LayerGroup.extend({
 					if (property === 'fillColor') {
 						if (params.gradient) {
 							i.style.cssText += 'background-image:linear-gradient(left , ' + value + ' 0%, ' + nextValue + ' 100%);' +
-										   'background-image:-ms-linear-gradient(left , ' + value + ' 0%, ' + nextValue + ' 100%);' +
-										   'background-image:-moz-linear-gradient(left , ' + value + ' 0%, ' + nextValue + ' 100%);' +
-										   'background-image:-webkit-linear-gradient(left , ' + value + ' 0%, ' + nextValue + ' 100%);';
+								'background-image:-ms-linear-gradient(left , ' + value + ' 0%, ' + nextValue + ' 100%);' +
+								'background-image:-moz-linear-gradient(left , ' + value + ' 0%, ' + nextValue + ' 100%);' +
+								'background-image:-webkit-linear-gradient(left , ' + value + ' 0%, ' + nextValue + ' 100%);';
 						}
 						else {
 							i.style.cssText += 'background-color:' + value + ';';
@@ -5568,16 +5586,16 @@ L.DataLayer = L.LayerGroup.extend({
 
 					if (property === 'color') {
 						i.style.cssText += 'border-top-color:' + value + ';' +
-								   'border-bottom-color:' + nextValue + ';' +
-								   'border-left-color:' + value + ';' +
-								   'border-right-color:' + nextValue + ';';
+							'border-bottom-color:' + nextValue + ';' +
+							'border-left-color:' + value + ';' +
+							'border-right-color:' + nextValue + ';';
 					}
 
 					if (property === 'weight') {
 						i.style.cssText += 'border-top-width:' + value + ';' +
-								   'border-bottom-width:' + nextValue + ';' +
-								   'border-left-width:' + value + ';' +
-								   'border-right-width:' + nextValue + ';';
+							'border-bottom-width:' + nextValue + ';' +
+							'border-left-width:' + value + ';' +
+							'border-right-width:' + nextValue + ';';
 					}
 
 					var min = params.minX || (segmentSize * index) + minX;
@@ -5614,7 +5632,7 @@ L.DataLayer = L.LayerGroup.extend({
 		var segmentWidth = (legendWidth / numSegments) - 2 * weight;
 		var displayText;
 		var displayOptions = this.options.displayOptions || {};
-		
+
 		if (className) {
 			L.DomUtil.addClass(legendElement, className);
 		}
@@ -5631,25 +5649,25 @@ L.DataLayer = L.LayerGroup.extend({
 		// Iterate through the fields
 		for (var field in displayOptions) {
 			if (displayOptions.hasOwnProperty(field)) {
-				
+
 				// Get the properties associated with a given field
 				var displayProperties = displayOptions[field];
-				
+
 				// If the field should not be excluded from the legend, then continue...
 				if (!displayProperties.excludeFromLegend) {
-					
+
 					// Use the provided name or use the field key
 					var displayName = displayProperties.displayName || field;
-	
+
 					// Determine the function used to print out y values
 					displayText = displayProperties.displayText;
-	
+
 					var displayTextFunction = displayText ? displayText : defaultFunction;
-	
+
 					var styles = displayProperties.styles;
-	
+
 					L.DomUtil.create('div', 'legend-title', legendElement).innerHTML = displayName;
-	
+
 					// If styles have been specified (e.g. a key/value mapping b/w a given input value and a given output value),
 					// then use those
 					if (styles) {
@@ -5665,9 +5683,9 @@ L.DataLayer = L.LayerGroup.extend({
 						var ignoreProperties = ['displayName', 'displayText', 'minValue', 'maxValue'];
 						var breaks = displayProperties.breaks;
 						var segmentWidths = [];
-						
+
 						numSegments = legendOptions.numSegments || 10;
-						
+
 						// If breaks have been specified, then use those values to calculate segment widths and provide x ranges
 						// for each segment
 						if (breaks) {
@@ -5680,10 +5698,10 @@ L.DataLayer = L.LayerGroup.extend({
 								segmentWidths.push(width - lastWidth - 2 * weight);
 								lastWidth = width;
 							}
-							
+
 							numSegments = segmentWidths.length;
 						}
-						
+
 						// Add each segment to the legend
 						for (var index = 0; index < numSegments; ++index) {
 							var legendParams = {
@@ -5698,7 +5716,7 @@ L.DataLayer = L.LayerGroup.extend({
 								maxValue: maxValue,
 								gradient: legendOptions.gradient
 							};
-	
+
 							// If there are segmentWidths, then use those
 							if (breaks && segmentWidths.length > 0) {
 								legendParams.segmentWidth = segmentWidths[index];
@@ -5707,11 +5725,11 @@ L.DataLayer = L.LayerGroup.extend({
 								legendParams.maxX = breaks[index + 1];
 								legendParams.breaks = breaks;
 							}
-							
+
 							var element = this._getLegendElement(legendParams);
-	
+
 							scaleBars.appendChild(element);
-	
+
 						}
 						legendElement.appendChild(legendItems);
 					}
@@ -5841,7 +5859,7 @@ L.PanoramioLayer = L.PanoramioLayer.extend({
 				var content = L.DomUtil.create('div', '', container);
 
 				L.DomUtil.addClass(content, 'panoramio-content');
-				
+
 				var photo = L.DomUtil.create('img', 'photo', content);
 				photo.setAttribute('onload', 'this.style.opacity=1;');
 				photo.setAttribute('src', photoUrl);
@@ -5850,9 +5868,9 @@ L.PanoramioLayer = L.PanoramioLayer.extend({
 				var photoInfo = L.DomUtil.create('div', 'photo-info', content);
 				photoInfo.style.width = (width - 20) + 'px';
 				photoInfo.innerHTML = '<span>' + title + '</span>' +
-						      '<a class="photo-link" target="_blank" href="' + record.photo_url + '">' +
-						      '<img src="http://www.panoramio.com/img/glass/components/logo_bar/panoramio.png" style="height: 14px;"/>' +
-						      '</a>';
+					'<a class="photo-link" target="_blank" href="' + record.photo_url + '">' +
+					'<img src="http://www.panoramio.com/img/glass/components/logo_bar/panoramio.png" style="height: 14px;"/>' +
+					'</a>';
 
 				var authorLink = L.DomUtil.create('a', 'author-link', content);
 				authorLink.setAttribute('target', '_blank');
@@ -6017,8 +6035,8 @@ L.PanoramioLayer = L.PanoramioLayer.extend({
 
 	requestJsonp: function (url, data, callback) {
 		var self = this,
-		    key = 'function' + new Date().getTime(),
-		    params = [];
+			key = 'function' + new Date().getTime(),
+			params = [];
 
 		data.callback = 'window.LeafletDvfJsonpCallbacks.' + key;
 
@@ -6043,14 +6061,14 @@ L.PanoramioLayer = L.PanoramioLayer.extend({
 			document.head.removeChild(this.jsonpScript);
 			this.jsonpScript = null;
 		}
-		
+
 		this.jsonpScript = document.createElement('script');
 		this.jsonpScript.setAttribute('type', 'text/javascript');
 		this.jsonpScript.setAttribute('async', 'true');
 		this.jsonpScript.setAttribute('src', url);
-		
+
 		document.head.appendChild(this.jsonpScript);
-		
+
 		return {
 			abort: function () {
 				if (key in window.LeafletDvfJsonpCallbacks) {
@@ -6405,7 +6423,8 @@ L.RadialMeterMarkerDataLayer = L.DataLayer.extend({
 L.radialMeterMarkerDataLayer = function (data, options) {
 	return new L.RadialMeterMarkerDataLayer(data, options);
 };
-;/*
+;
+/*
  *
  */
 L.CalloutLine = L.Path.extend({
@@ -6430,7 +6449,7 @@ L.CalloutLine = L.CalloutLine.extend({
 		L.Path.prototype.initialize.call(this, options);
 		this._latlng = latlng;
 	},
-	
+
 	options: {
 		size: new L.Point(60, 30),
 		position: new L.Point(0, 0),
@@ -6447,7 +6466,7 @@ L.CalloutLine = L.CalloutLine.extend({
 		lineJoin: 'miter',
 		arrow: false
 	},
-	
+
 	projectLatlngs: function () {
 		this._point = this._map.latLngToLayerPoint(this._latlng);
 		this._points = this._getPoints();
@@ -6455,71 +6474,71 @@ L.CalloutLine = L.CalloutLine.extend({
 
 	getEndPoint: function () {
 		this.projectLatlngs();
-		
+
 		return this._points[this._points.length - 1];
 	},
-	
+
 	_getPathAngle: function () {
 		return new L.SVGPathBuilder(this._points, [], {
 			closePath: false
 		}).build(6);
 	},
-	
+
 	_getPathArc: function () {
 		var direction = (this.options.direction || L.CalloutLine.DIRECTION.NE).toLowerCase();
 		var yDirection = direction[0];
 		var yMultiplier = yDirection === 'n' ? -1 : 1;
 		var point1 = this._points[0];
 		var point2 = this._points[this._points.length - 1];
-		
+
 		var parts = ['M', point1.x, ',', point1.y, ' Q', point1.x, ',', point1.y + yMultiplier * this.options.size.y, ' ', point2.x, ',', point2.y];
-	
+
 		return parts.join(' ');
 	},
-	
+
 	_getPoints: function () {
 		var x = this._point.x + this.options.position.x;
 		var y = this._point.y + this.options.position.y;
 		var width = this.options.size.x;
 		var height = this.options.size.y;
 		var direction = (this.options.direction || L.CalloutLine.DIRECTION.NE).toLowerCase();
-		
+
 		var points = [];
 		var xDirection = direction[1];
 		var yDirection = direction[0];
-		
+
 		var xMultiplier = xDirection === 'w' ? -1 : 1;
 		var yMultiplier = yDirection === 'n' ? -1 : 1;
-		
+
 		points.push(new L.Point(x, y));
-		
+
 		var yEnd = y + yMultiplier * height;
 		var halfWidth = width / 2;
-		
+
 		var angle = Math.atan(height / halfWidth);
-		
+
 		if (this.options.lineStyle === L.CalloutLine.LINESTYLE.ARC) {
 			angle = Math.atan(Math.pow(height, 2) / halfWidth);
 		}
 		else if (this.options.lineStyle === L.CalloutLine.LINESTYLE.STRAIGHT) {
 			angle = Math.atan(height/ width);
 		}
-		
+
 		this._angle = angle;
-		
+
 		if (this.options.lineStyle !== L.CalloutLine.LINESTYLE.STRAIGHT) {
 			var elbowPoint = new L.Point(x + xMultiplier * halfWidth, yEnd);
-		
+
 			points.push(elbowPoint);
 		}
-		
+
 		var endPoint = new L.Point(x + xMultiplier * width, yEnd);
-		
+
 		points.push(endPoint);
-		
+
 		return points;
 	},
-	
+
 	getBounds: function () {
 		var map = this._map,
 			point = map.project(this._latlng),
@@ -6535,24 +6554,24 @@ L.CalloutLine = L.CalloutLine.extend({
 		this._latlng = latlng;
 		this.redraw();
 	},
-	
+
 	getLatLng: function () {
 		return this._latlng;
 	},
 
 	getPathString: function () {
 		this._path.setAttribute('shape-rendering', 'geometricPrecision');
-		
+
 		var lineStyle = this.options.lineStyle || L.CalloutLine.LINESTYLE.ANGLE;
 		var path = '';
-		
+
 		if (lineStyle === L.CalloutLine.LINESTYLE.ANGLE || lineStyle === L.CalloutLine.LINESTYLE.STRAIGHT) {
 			path += this._getPathAngle();
 		}
 		else {
 			path += this._getPathArc();
 		}
-		
+
 		return path;
 	}
 });
@@ -6569,44 +6588,44 @@ L.Callout = L.LayerGroup.extend({
 		color: '#FFFFFF',
 		fillColor: '#FFFFFF'
 	},
-	
+
 	initialize: function (latlng, options) {
 		L.Util.setOptions(this, options);
-		
+
 		L.LayerGroup.prototype.initialize.call(this, options);
-		
+
 		this._latlng = latlng;
 	},
-	
+
 	onAdd: function (map) {
 		L.LayerGroup.prototype.onAdd.call(this, map);
-		
+
 		this.addLayers();
 	},
-	
+
 	onRemove: function (map) {
 		L.LayerGroup.prototype.onRemove.call(this, map);
-		
+
 		this.clearLayers();
 	},
-	
+
 	addArrow: function (angle, direction, position) {
 		if (this.options.arrow) {
 			angle = L.LatLng.RAD_TO_DEG * angle;
 			var numberOfSides = this.options.numberOfSides || 3;
 			var radius = this.options.radius || 6;
-			
+
 			var startRotation = 180 / numberOfSides;
-			
+
 			var offsets = {
 				se: startRotation + angle,
 				sw: 180 + startRotation - angle,
 				nw: 180 + startRotation + angle,
 				ne: startRotation - angle
 			};
-			
+
 			var rotation = offsets[direction];
-			
+
 			var arrow = new L.RegularPolygonMarker(this._latlng, {
 				position: position,
 				numberOfSides: numberOfSides,
@@ -6621,56 +6640,56 @@ L.Callout = L.LayerGroup.extend({
 				lineCap: 'butt',
 				lineJoin: 'miter'
 			});
-			
+
 			this.addLayer(arrow);
 		}
 	},
-	
+
 	addLine: function () {
 		var lineOptions = {};
-		
+
 		for (var key in this.options) {
 			if (key !== 'icon') {
 				lineOptions[key] = this.options[key];
 			}
 		}
-		
+
 		var calloutLine = new L.CalloutLine(this._latlng, lineOptions);
-		
+
 		this.addLayer(calloutLine);
-		
+
 		return calloutLine;
 	},
-	
+
 	addIcon: function (direction, position) {
 		var size = this.options.size;
 		var icon = this.options.icon;
 		var iconSize = icon.options.iconSize;
-		
+
 		var yDirection = direction[0];
 		var xDirection = direction[1];
-		
+
 		var xAnchor = xDirection === 'w' ? iconSize.x + size.x - position.x : -1 * (size.x + position.x);
 		var yAnchor = yDirection === 'n' ? iconSize.y/2 + size.y - position.y : -1 * (-iconSize.y/2 + size.y + position.y);
-		
+
 		icon.options.iconAnchor = new L.Point(xAnchor, yAnchor);
-		
+
 		var iconMarker = new L.Marker(this._latlng, {
 			icon: icon
 		});
-		
+
 		this.addLayer(iconMarker);
 	},
-	
+
 	addLayers: function () {
 		var direction = (this.options.direction || 'ne').toLowerCase();
 		var position = this.options.position || new L.Point(0, 0);
 		var calloutLine;
-		
+
 		calloutLine = this.addLine();
-		
+
 		this.addIcon(direction, position);
-		
+
 		this.addArrow(calloutLine._angle, direction, position);
 	}
 });
@@ -6689,10 +6708,10 @@ L.FlowLine = L.DataLayer.extend({
 			var point1 = this._map.latlngToLayerPoint(latlng1);
 			var point2 = this._map.latlngToLayerPoint(latlng2);
 			var lineFunction = new L.LinearFunction(point1, point2);
-			
+
 			var numPoints = Math.ceil(point1.distanceTo(point2)/options.interpolationOptions.segmentLength);
 			var points = lineFunction.samplePoints(numPoints);
-			
+
 			// Need the passed in records in order to interpolate record field values
 			// TODO:  Implement this
 		}
@@ -6707,7 +6726,7 @@ L.FlowLine = L.FlowLine.extend({
 		L.Util.setOptions(this, options);
 		L.DataLayer.prototype.initialize.call(this, data, options);
 	},
-	
+
 	options: {
 		getLine: L.FlowLine.LINE_FUNCTION,
 		showLegendTooltips: true,
@@ -6724,117 +6743,117 @@ L.FlowLine = L.FlowLine.extend({
 			return layerStyle;
 		}
 	},
-	
+
 	onEachSegment: function (record1, record2, line) {
 		var deltas = {};
-		
+
 		if (this.options.timeField) {
 			var timeValue1 = L.Util.getFieldValue(record1, this.options.timeField);
 			var timeValue2 = L.Util.getFieldValue(record2, this.options.timeField);
 			var format = this.options.timeFormat;
-			
+
 			var moment1 = format ? moment(timeValue1, format) : moment(timeValue1);
 			var moment2 = format ? moment(timeValue2, format) : moment(timeValue2);
 			var deltaTime = moment2.valueOf() - moment1.valueOf(); // in milliseconds
-			
+
 			deltas.time = deltaTime;
 		}
-			
+
 		for (var key in this.options.displayOptions) {
 			var value1 = L.Util.getFieldValue(record1, key);
 			var value2 = L.Util.getFieldValue(record2, key);
 			var change = value2 - value1;
 			var percentChange = (change / value1) * 100;
-			
+
 			deltas[key] = {
 				from: value1,
 				to: value2,
 				change: change,
 				percentChange: percentChange
 			};
-			
+
 			if (deltas.time) {
 				deltas[key].changeOverTime = change/deltas.time;
 			}
 		}
-		
+
 		var latlngs = line.getLatLngs();
 		var distance = latlngs[0].distanceTo(latlngs[1]);
 		var velocity;
-		
+
 		if (deltas.time) {
-			velocity = distance/(deltas.time * 1000);	
+			velocity = distance / (deltas.time * 1000);
 		}
-		
+
 		if (this.options.onEachSegment) {
 			this.options.onEachSegment.call(this, record1, record2, line, deltas, distance, velocity);
 		}
 	},
-	
+
 	_loadRecords: function (records) {
 		var markers = [];
-		
+
 		this._lastRecord = null;
-		
+
 		for (var recordIndex in records) {
 			if (records.hasOwnProperty(recordIndex)) {
 				var record = records[recordIndex];
-			
+
 				record = this.options.deriveProperties ? this.options.deriveProperties(record) : record;
-				
+
 				markers = this._addRecord(record, recordIndex, markers);
 			}
 		}
-		
+
 		while (markers.length > 0) {
 			this.addLayer(markers.pop());
 		}
 	},
-	
+
 	addRecord: function (record) {
 		this._addRecord(record);
-		
+
 		return this;
 	},
-	
+
 	_addRecord: function (record, recordIndex, markers) {
 		var location = this._getLocation(record, recordIndex);
 		var options = this.options.layerOptions;
-		
+
 		if (location) {
 			var marker = this._getLayer(location, options, record);
 			var line;
-			
+
 			var includeLayer = true;
 
 			if (this.options.includeLayer) {
 				includeLayer = this.options.includeLayer(record);
 			}
-			
+
 			if (this._lastRecord && includeLayer) {
-				
+
 				options = this._getDynamicOptions(this._lastRecord);
 
 				line = this.options.getLine.call(this, this._lastMarker.getLatLng(), marker.getLatLng(), options.layerOptions);
-			
+
 				this.addLayer(line);
-				
+
 				if (this.options.showLegendTooltips) {
 					this._bindMouseEvents(line, options.layerOptions, options.legendDetails);
 				}
-				
+
 				this.onEachSegment(this._lastRecord, record, line);
-				
+
 			}
-			
+
 			if (includeLayer) {
 				this._lastRecord = record;
 				this._lastMarker = marker;
 			}
 		}
-		
+
 		return markers;
-	}	
+	}
 });
 
 L.flowLine = function (data, options) {
@@ -6850,7 +6869,7 @@ L.ArcedFlowLine = L.FlowLine.extend({
 			return new L.ArcedPolyline([latlng1, latlng2], options);
 		}
 	},
-	
+
 	initialize: function (data, options) {
 		L.FlowLine.prototype.initialize.call(this, data, options);
 	}
@@ -6865,12 +6884,12 @@ L.arcedFlowLine = function (data, options) {
  */
 L.ArcedPolyline = L.Path.extend({
 	includes: TextFunctions,
-	
+
 	initialize: function (latlngs, options) {
 		L.Path.prototype.initialize.call(this, options);
 		this._latlngs = latlngs;
 	},
-	
+
 	options: {
 		distanceToHeight: new L.LinearFunction([0, 5], [1000, 200]),
 		color: '#FFFFFF',
@@ -6882,22 +6901,22 @@ L.ArcedPolyline = L.Path.extend({
 		dropShadow: false,
 		optimizeSpeed: false
 	},
-	
+
 	projectLatlngs: function () {
 		this._points = [];
-		
+
 		for (var i = 0; i < this._latlngs.length; ++i) {
 			this._points.push(this._map.latLngToLayerPoint(this._latlngs[i]));
 		}
 	},
-	
+
 	getBounds: function () {
 		var bounds = new L.LatLngBounds();
-		
+
 		for (var i = 0; i < this._latlngs.length; ++i) {
 			bounds.extend(this._latlngs[i]);
 		}
-		
+
 		return bounds;
 	},
 
@@ -6905,7 +6924,7 @@ L.ArcedPolyline = L.Path.extend({
 		this._latlngs = latlngs;
 		this.redraw();
 	},
-	
+
 	getLatLngs: function () {
 		return this._latlngs;
 	},
@@ -6915,28 +6934,30 @@ L.ArcedPolyline = L.Path.extend({
 		var heightOffset = this.options.distanceToHeight.evaluate(distance);
 
 		var parts = ['M', point1.x, ',', point1.y, ' C', point1.x, ',', point1.y - heightOffset, ' ', point2.x, ',', point2.y - heightOffset, ' ', point2.x, ',', point2.y ];
-		
+
 		return parts.join(' ');
 	},
-	
+
 	getPathString: function () {
 		if (this.options.optimizeSpeed) {
 			this._path.setAttribute('shape-rendering', 'optimizeSpeed');
 		}
-		
+
 		var parts = [];
-		
+
 		for (var i = 0; i < this._points.length - 1; ++i) {
 			parts.push(this.drawSegment(this._points[i], this._points[i + 1]));
 		}
-		
+
 		return parts.join('') ;
 	}
 });
 
 L.arcedPolyline = function (latlngs, options) {
 	return new L.ArcedPolyline(latlngs, options);
-};;L.Control.Legend = L.Control.extend({
+};
+;
+L.Control.Legend = L.Control.extend({
 	options: {
 		position: 'bottomright',
 		autoAdd: true
@@ -6944,7 +6965,7 @@ L.arcedPolyline = function (latlngs, options) {
 
 	onAdd: function (map) {
 		var className = 'leaflet-control-legend',
-		    container = L.DomUtil.create('div', className);
+			container = L.DomUtil.create('div', className);
 
 		var self = this;
 
@@ -6965,12 +6986,12 @@ L.arcedPolyline = function (latlngs, options) {
 		this.toggleSize = L.bind(this.toggleSize, this);
 
 		L.DomEvent
-		.addListener(container, 'mouseover', this.toggleSize)
-		.addListener(container, 'mouseout', this.toggleSize)
-		.addListener(container, 'touchstart', this.toggleSize)
-		.addListener(container, 'touchend', this.toggleSize)
-		.addListener(container, 'click', L.DomEvent.stopPropagation)
-		.addListener(container, 'click', L.DomEvent.preventDefault);
+			.addListener(container, 'mouseover', this.toggleSize)
+			.addListener(container, 'mouseout', this.toggleSize)
+			.addListener(container, 'touchstart', this.toggleSize)
+			.addListener(container, 'touchend', this.toggleSize)
+			.addListener(container, 'click', L.DomEvent.stopPropagation)
+			.addListener(container, 'click', L.DomEvent.preventDefault);
 
 		return container;
 	},
@@ -7019,7 +7040,7 @@ L.arcedPolyline = function (latlngs, options) {
 
 	addLegend: function (id, html) {
 		var container = this._container,
-		    legend = document.getElementById(id);
+			legend = document.getElementById(id);
 
 		if (!legend) {
 			legend = L.DomUtil.create('div', '', container);

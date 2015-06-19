@@ -31,9 +31,9 @@ div.leaflet-div-icon {
 }
 
 div.leaflet-div-icon div {
-	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;	
-	margin: 0px;	
-	padding: 0px;	
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	margin: 0px;
+	padding: 0px;
 	line-height: 12px;
 }
 
@@ -82,7 +82,7 @@ div.leaflet-div-icon div div.key {
 
 .choropleth-text {
 	font-size: x-small;
-	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;	
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 	vertical-align: middle;
 	text-align: center;
 }
